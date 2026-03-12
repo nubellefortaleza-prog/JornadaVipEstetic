@@ -12,6 +12,8 @@ import RewardsView from './components/RewardsView';
 import PreProcedureView from './components/PreProcedureView';
 import PostProcedureView from './components/PostProcedureView';
 import EvolutionView from './components/EvolutionView';
+import { registerServiceWorker } from './services/notificationService';
+import { trackScreen } from './services/analyticsService';
 
 // Tipagem para o Smartlook no window
 declare global {
@@ -31,6 +33,16 @@ const App: React.FC = () => {
     level: 'Iniciante'
   });
   const [showChat, setShowChat] = useState(false);
+
+  // Registra o Service Worker na inicialização do app
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  // Rastreia mudança de tela
+  useEffect(() => {
+    if (profile) trackScreen(profile.id, AppStep[step].toLowerCase());
+  }, [step, profile]);
 
   useEffect(() => {
     if (profile && window.smartlook) {
@@ -119,7 +131,14 @@ const App: React.FC = () => {
           />
         );
       case AppStep.REWARDS:
-        return <RewardsView rewards={rewards} onBack={() => setStep(AppStep.DASHBOARD)} />;
+        return (
+          <RewardsView
+            rewards={rewards}
+            patientId={profile?.id || ''}
+            patientName={profile?.name || ''}
+            onBack={() => setStep(AppStep.DASHBOARD)}
+          />
+        );
       case AppStep.PRE_PROCEDURE:
         return <PreProcedureView onBack={() => setStep(AppStep.DASHBOARD)} />;
       case AppStep.POST_PROCEDURE:

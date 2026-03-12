@@ -1,17 +1,43 @@
 
 import React from 'react';
 import { RewardPoints } from '../types';
+import { trackReferralSent } from '../services/analyticsService';
+
+const APP_URL = 'https://vipestetica.app'; // Configure com a URL real do app
 
 interface Props {
   rewards: RewardPoints;
+  patientId: string;
+  patientName: string;
   onBack: () => void;
 }
 
-const RewardsView: React.FC<Props> = ({ rewards, onBack }) => {
+const RewardsView: React.FC<Props> = ({ rewards, patientId, patientName, onBack }) => {
+  const referralLink = `${APP_URL}/ref/${patientId}`;
+
   const handleShare = () => {
-    const text = "Estou amando minha jornada na VIP Estética! Use meu link para ganhar um mimo: https://vipestetica.app/ref/paciente123";
+    const firstName = patientName.split(' ')[0];
+    const text = `Olá! Estou amando minha jornada na VIP Estética 🌿✨\n\nVocê merece se cuidar também! Use meu link exclusivo e ganhe um mimo especial na sua primeira consulta:\n👉 ${referralLink}\n\nBeijo, ${firstName} 💚`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    trackReferralSent(patientId);
   };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      alert('Link copiado! Compartilhe com seus amigos.');
+    } catch {
+      alert(`Seu link: ${referralLink}`);
+    }
+    trackReferralSent(patientId);
+  };
+
+  const nextLevelPts: Record<string, number> = {
+    Iniciante: 500,
+    'Avançado': 1500,
+    Premium: Infinity,
+  };
+  const progressToNext = Math.min((rewards.total / (nextLevelPts[rewards.level] || 500)) * 100, 100);
 
   return (
     <div className="flex flex-col flex-1 pb-10">
@@ -24,13 +50,25 @@ const RewardsView: React.FC<Props> = ({ rewards, onBack }) => {
         <h2 className="text-xl font-serif">Indicações e Prêmios</h2>
       </div>
 
-      <div className="bg-sage/10 border border-sage/20 rounded-3xl p-6 text-center mb-8">
+      {/* Card de nível com barra de progresso */}
+      <div className="bg-sage/10 border border-sage/20 rounded-3xl p-6 text-center mb-6">
         <p className="text-[10px] uppercase tracking-widest text-sage mb-2">Nível atual</p>
         <h3 className="text-3xl font-serif mb-1">{rewards.level}</h3>
-        <p className="text-xs text-white/60">{rewards.total} pontos acumulados</p>
+        <p className="text-xs text-white/60 mb-4">{rewards.total} pontos acumulados</p>
+        {rewards.level !== 'Premium' && (
+          <>
+            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-sage rounded-full transition-all duration-700" style={{ width: `${progressToNext}%` }} />
+            </div>
+            <p className="text-[9px] text-white/30 mt-1.5">
+              {Math.max(0, (nextLevelPts[rewards.level] || 500) - rewards.total)} pts para o próximo nível
+            </p>
+          </>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      {/* Contadores */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
           <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Indicados</p>
           <p className="text-2xl font-serif">{rewards.referralsCount}</p>
@@ -41,21 +79,39 @@ const RewardsView: React.FC<Props> = ({ rewards, onBack }) => {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h4 className="text-xs uppercase tracking-widest text-white/40 px-1">Regras de Ouro</h4>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60">Indicou amigo</span>
-            <span className="sage-green font-bold">+50 pts</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/60">Amigo realizou procedimento</span>
-            <span className="sage-green font-bold">+200 pts</span>
-          </div>
+      {/* Link de indicação pessoal */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+        <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Seu link exclusivo</p>
+        <div className="flex items-center space-x-2">
+          <p className="text-xs text-sage flex-1 truncate font-mono">{referralLink}</p>
+          <button
+            onClick={handleCopyLink}
+            className="flex-shrink-0 px-3 py-1.5 bg-white/10 text-[10px] font-bold rounded-lg hover:bg-white/15 transition-all"
+          >
+            Copiar
+          </button>
         </div>
       </div>
 
-      <button 
+      {/* Regras */}
+      <div className="space-y-3 mb-8">
+        <h4 className="text-xs uppercase tracking-widest text-white/40 px-1">Regras de Ouro</h4>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+          {[
+            { label: 'Indicou um amigo', pts: '+50 pts' },
+            { label: 'Amigo realizou procedimento', pts: '+200 pts' },
+            { label: '3 convertidos → nível Avançado', pts: '🏆' },
+            { label: '10 convertidos → sorteio de procedimento grátis', pts: '🎁' },
+          ].map(item => (
+            <div key={item.label} className="flex items-center justify-between text-xs">
+              <span className="text-white/60">{item.label}</span>
+              <span className="sage-green font-bold">{item.pts}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
         onClick={handleShare}
         className="mt-auto w-full py-4 bg-sage text-[#1A1A1B] font-semibold rounded-2xl flex items-center justify-center space-x-2 shadow-lg shadow-sage/20 active:scale-95 transition-all"
       >
