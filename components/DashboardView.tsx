@@ -1,6 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { PatientProfile, RewardPoints, AppStep, Reminder } from '../types';
+import {
+  requestNotificationPermission,
+  getNotificationPermission,
+  getPendingCampaignsForPatient,
+  markCampaignAsRead,
+  PopupCampaign,
+} from '../services/notificationService';
+import { trackScreen, trackFeature, trackNotificationOpened } from '../services/analyticsService';
 
 const WHATSAPP_NUMBER = '5500000000000'; // Configure com o número da clínica
 
@@ -14,29 +22,88 @@ interface Props {
 
 const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNavigate, onMoodCheckin }) => {
   const [activeReminder, setActiveReminder] = useState<Reminder | null>(null);
+  const [activeCampaign, setActiveCampaign] = useState<PopupCampaign | null>(null);
+  const [campaignQueue, setCampaignQueue] = useState<PopupCampaign[]>([]);
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
+
   const firstName = profile?.name?.split(' ')[0] || 'Paciente';
 
   useEffect(() => {
+    trackScreen(profile.id, 'dashboard');
+
+    // Verificar lembrete pendente (enviado individualmente pelo admin)
     const allRecords = JSON.parse(localStorage.getItem('clinic_records') || '[]');
     const myRecord = allRecords.find((r: any) => r.profile.id === profile.id);
     if (myRecord?.reminders?.length > 0) {
       const unread = myRecord.reminders.find((rem: Reminder) => !rem.read);
       if (unread) setActiveReminder(unread);
     }
+
+    // Verificar campanhas pendentes
+    const pending = getPendingCampaignsForPatient(profile.id);
+    if (pending.length > 0) {
+      setCampaignQueue(pending);
+      setActiveCampaign(pending[0]);
+    }
+
+    // Exibir banner para pedir permissão de notificação
+    if (getNotificationPermission() === 'default') {
+      setTimeout(() => setShowNotifBanner(true), 2000);
+    }
   }, [profile.id]);
 
-  const closeReminder = () => {
-    setActiveReminder(null);
+  const closeReminder = () => setActiveReminder(null);
+
+  const closeCampaign = () => {
+    if (!activeCampaign) return;
+    markCampaignAsRead(activeCampaign.id, profile.id);
+    trackNotificationOpened(profile.id, activeCampaign.id);
+    const rest = campaignQueue.filter(c => c.id !== activeCampaign.id);
+    setCampaignQueue(rest);
+    setActiveCampaign(rest.length > 0 ? rest[0] : null);
+  };
+
+  const handleEnableNotifications = async () => {
+    const perm = await requestNotificationPermission();
+    setShowNotifBanner(false);
+    if (perm === 'granted') {
+      trackFeature(profile.id, 'push_notifications_enabled');
+    }
   };
 
   const openWhatsApp = () => {
     const msg = encodeURIComponent(`Olá! Sou ${profile.name} e gostaria de falar sobre minha jornada VIP.`);
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+    trackFeature(profile.id, 'whatsapp_contact');
   };
 
   return (
-    <div className="flex flex-col space-y-6 pb-20 relative">
-      {/* Pop-up de Lembrete */}
+    <div className="flex flex-col space-y-5 pb-20 relative">
+
+      {/* ── Banner de permissão de notificação ──────────────────────────────── */}
+      {showNotifBanner && (
+        <div className="bg-sage/10 border border-sage/30 rounded-2xl p-4 flex items-start space-x-3">
+          <div className="w-8 h-8 bg-sage/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v1m6 0H9" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-bold text-white/90 mb-0.5">Receba avisos da clínica</p>
+            <p className="text-[10px] text-white/50 mb-3">Ative as notificações para receber lembretes de consulta e orientações pós-procedimento.</p>
+            <div className="flex space-x-2">
+              <button onClick={handleEnableNotifications} className="px-4 py-1.5 bg-sage text-[#1A1A1B] text-[10px] font-bold rounded-lg">
+                Ativar
+              </button>
+              <button onClick={() => setShowNotifBanner(false)} className="px-4 py-1.5 bg-white/5 text-white/40 text-[10px] rounded-lg">
+                Agora não
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Popup de Lembrete individual ─────────────────────────────────────── */}
       {activeReminder && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-6 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#1A1A1B] border border-sage/30 rounded-3xl p-8 w-full shadow-2xl shadow-sage/5">
@@ -54,7 +121,36 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
         </div>
       )}
 
-      {/* Header */}
+      {/* ── Popup de Campanha ────────────────────────────────────────────────── */}
+      {activeCampaign && !activeReminder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-6 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#1A1A1B] border border-sage/30 rounded-3xl w-full shadow-2xl shadow-sage/5 overflow-hidden">
+            {activeCampaign.imageUrl && (
+              <img src={activeCampaign.imageUrl} alt="" className="w-full h-40 object-cover" />
+            )}
+            <div className="p-8">
+              <h3 className="text-xl font-serif text-center mb-3">{activeCampaign.title}</h3>
+              <p className="text-sm text-white/60 text-center leading-relaxed mb-6">{activeCampaign.message}</p>
+              {activeCampaign.ctaLabel && activeCampaign.ctaUrl && (
+                <a
+                  href={activeCampaign.ctaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={closeCampaign}
+                  className="block w-full py-3 bg-sage text-[#1A1A1B] font-bold rounded-2xl text-center mb-3"
+                >
+                  {activeCampaign.ctaLabel}
+                </a>
+              )}
+              <button onClick={closeCampaign} className="w-full py-3 bg-white/5 border border-white/10 text-white/60 text-sm rounded-2xl">
+                {campaignQueue.length > 1 ? `Fechar (${campaignQueue.length - 1} restante${campaignQueue.length > 2 ? 's' : ''})` : 'Fechar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-sm font-light text-white/60">Olá, {firstName}</h2>
@@ -66,14 +162,17 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
         </div>
       </div>
 
-      {/* Check-in de Humor */}
+      {/* ── Check-in de Humor ────────────────────────────────────────────────── */}
       <div className="bg-white/5 border border-white/10 rounded-3xl p-5">
         <h3 className="text-[10px] uppercase tracking-widest text-white/40 mb-3 text-center">Como você está se sentindo hoje?</h3>
         <div className="flex justify-around">
           {['😔', '😐', '😊', '✨'].map((emoji, idx) => (
             <button
               key={idx}
-              onClick={() => onMoodCheckin(emoji)}
+              onClick={() => {
+                onMoodCheckin(emoji);
+                trackFeature(profile.id, 'mood_checkin');
+              }}
               className="text-2xl hover:scale-125 transition-transform p-2 grayscale hover:grayscale-0"
             >
               {emoji}
@@ -82,36 +181,54 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
         </div>
       </div>
 
-      {/* Bloco de Próximo Atendimento */}
-      <div className="bg-white/5 border-l-4 border-sage rounded-xl p-5 flex justify-between items-center">
-        <div>
-          <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Seu próximo atendimento</span>
-          <h3 className="text-lg font-serif sage-green mt-1">Sexta-feira, 25 de Outubro</h3>
-          <p className="text-[10px] text-white/60 mt-0.5">Horário: 14:30h • Dra. Sofia</p>
-        </div>
+      {/* ── Bloco de Próximo Atendimento ─────────────────────────────────────── */}
+      <div className="bg-white/5 border-l-4 border-sage rounded-xl p-5">
+        <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Seu próximo atendimento</span>
+        <h3 className="text-lg font-serif sage-green mt-1">Sexta-feira, 25 de Outubro</h3>
+        <p className="text-[10px] text-white/60 mt-0.5">Horário: 14:30h • Dra. Sofia</p>
       </div>
 
-      {/* Grid Features */}
+      {/* ── Grid Features ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => onNavigate(AppStep.PRE_PROCEDURE)} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-          <div><span className="text-sm font-semibold block">Pré-Procedimento</span><span className="text-[10px] text-white/40">Prepare-se</span></div>
-        </button>
-        <button onClick={() => onNavigate(AppStep.POST_PROCEDURE)} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-          <div><span className="text-sm font-semibold block">Pós-Procedimento</span><span className="text-[10px] text-white/40">Cuide-se</span></div>
-        </button>
-        <button onClick={() => onNavigate(AppStep.REWARDS)} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          <div><span className="text-sm font-semibold block">Indicar</span><span className="text-[10px] text-white/40">Ganhe prêmios</span></div>
-        </button>
-        <button onClick={() => onNavigate(AppStep.EVOLUTION)} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
-          <div><span className="text-sm font-semibold block">Evolução</span><span className="text-[10px] text-white/40">Acompanhe fotos</span></div>
-        </button>
+        {[
+          {
+            step: AppStep.PRE_PROCEDURE, feature: 'pre_procedure',
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+            label: 'Pré-Procedimento', sub: 'Prepare-se'
+          },
+          {
+            step: AppStep.POST_PROCEDURE, feature: 'post_procedure',
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />,
+            label: 'Pós-Procedimento', sub: 'Cuide-se'
+          },
+          {
+            step: AppStep.REWARDS, feature: 'rewards',
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+            label: 'Indicar', sub: 'Ganhe prêmios'
+          },
+          {
+            step: AppStep.EVOLUTION, feature: 'evolution',
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />,
+            label: 'Evolução', sub: 'Acompanhe fotos'
+          },
+        ].map(item => (
+          <button
+            key={item.label}
+            onClick={() => { onNavigate(item.step); trackFeature(profile.id, item.feature); }}
+            className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {item.icon}
+            </svg>
+            <div>
+              <span className="text-sm font-semibold block">{item.label}</span>
+              <span className="text-[10px] text-white/40">{item.sub}</span>
+            </div>
+          </button>
+        ))}
       </div>
 
-      {/* Botão WhatsApp */}
+      {/* ── Botão WhatsApp ────────────────────────────────────────────────────── */}
       <button
         onClick={openWhatsApp}
         className="w-full py-4 bg-[#25D366]/10 border border-[#25D366]/30 rounded-2xl flex items-center justify-center space-x-3 hover:bg-[#25D366]/20 transition-all"
