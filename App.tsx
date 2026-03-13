@@ -13,7 +13,7 @@ import PreProcedureView from './components/PreProcedureView';
 import PostProcedureView from './components/PostProcedureView';
 import EvolutionView from './components/EvolutionView';
 import { registerServiceWorker } from './services/notificationService';
-import { trackScreen } from './services/analyticsService';
+import { trackScreen, trackSessionStart } from './services/analyticsService';
 
 // Tipagem para o Smartlook no window
 declare global {
@@ -43,6 +43,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (profile) trackScreen(profile.id, AppStep[step].toLowerCase());
   }, [step, profile]);
+
+  // Inicia sessão (geolocalização + referrer) quando paciente chega ao dashboard
+  useEffect(() => {
+    if (profile && step === AppStep.DASHBOARD) {
+      trackSessionStart(profile.id);
+    }
+  }, [profile?.id, step === AppStep.DASHBOARD]);
 
   useEffect(() => {
     if (profile && window.smartlook) {
