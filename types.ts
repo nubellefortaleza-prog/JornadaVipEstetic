@@ -73,6 +73,6 @@ export interface RewardPoints {
 
 export interface PatientRecord {
   profile: PatientProfile;
-  anamnesis: AnamnesisData;
+  anamnesis?: AnamnesisData;
   reminders: Reminder[];
 }

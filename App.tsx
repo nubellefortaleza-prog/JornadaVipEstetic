@@ -71,14 +71,14 @@ const App: React.FC = () => {
 
   const savePatientRecord = (finalAnamnesis: AnamnesisData) => {
     if (profile) {
-      const newRecord: PatientRecord = {
-        profile,
-        anamnesis: finalAnamnesis,
-        reminders: []
-      };
-
-      const existing = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-      localStorage.setItem('clinic_records', JSON.stringify([...existing, newRecord]));
+      const existing: PatientRecord[] = JSON.parse(localStorage.getItem('clinic_records') || '[]');
+      const idx = existing.findIndex(r => r.profile.id === profile.id);
+      if (idx >= 0) {
+        existing[idx] = { ...existing[idx], anamnesis: finalAnamnesis };
+      } else {
+        existing.push({ profile, anamnesis: finalAnamnesis, reminders: [] });
+      }
+      localStorage.setItem('clinic_records', JSON.stringify(existing));
 
       setAnamnesis(finalAnamnesis);
       handleNextStep(AppStep.DASHBOARD);
@@ -131,8 +131,11 @@ const App: React.FC = () => {
       case AppStep.PROFILE_SETUP:
         return (
           <ProfileSetupView onComplete={(data) => {
-            setProfile({ ...data, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString() });
-            handleNextStep(AppStep.ANAMNESIS);
+            const newProfile = { ...data, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString() };
+            setProfile(newProfile);
+            const existing = JSON.parse(localStorage.getItem('clinic_records') || '[]');
+            localStorage.setItem('clinic_records', JSON.stringify([...existing, { profile: newProfile, reminders: [] }]));
+            handleNextStep(AppStep.DASHBOARD);
           }} />
         );
       case AppStep.ANAMNESIS:
