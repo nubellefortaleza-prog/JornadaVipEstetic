@@ -55,6 +55,17 @@
       }
     </style>
 
+    <!-- Google Analytics 4 — substitua G-XXXXXXXXXX pelo seu Measurement ID -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX', {
+        send_page_view: false   // page_view manual via analyticsService
+      });
+    </script>
+
     <!-- Smartlook Script -->
     <script type='text/javascript'>
       window.smartlook||(function(d) {

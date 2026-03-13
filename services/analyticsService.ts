@@ -11,6 +11,21 @@ const ANALYTICS_KEY    = 'clinic_analytics';
 const LOCATIONS_KEY    = 'clinic_locations';
 const SESSIONS_KEY     = 'clinic_sessions';
 
+// ── Google Analytics 4 helper ────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    gtag?: (...args: any[]) => void;
+    dataLayer?: any[];
+  }
+}
+
+const gtag = (command: string, action: string, params?: Record<string, any>) => {
+  if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+    window.gtag(command, action, params);
+  }
+};
+
 // ── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface AnalyticsEvent {
@@ -90,26 +105,40 @@ export const track = (patientId: string, event: string, metadata?: Record<string
   appendEvent({ patientId, event, metadata, timestamp: new Date().toISOString() });
 };
 
-export const trackScreen = (patientId: string, screen: string) =>
+export const trackScreen = (patientId: string, screen: string) => {
   track(patientId, 'screen_view', { screen });
+  gtag('event', 'page_view', { page_title: screen, page_location: `/${screen}`, user_id: patientId });
+};
 
-export const trackFeature = (patientId: string, feature: string) =>
+export const trackFeature = (patientId: string, feature: string) => {
   track(patientId, 'feature_used', { feature });
+  gtag('event', 'select_content', { content_type: 'feature', item_id: feature, user_id: patientId });
+};
 
-export const trackMood = (patientId: string, mood: string) =>
+export const trackMood = (patientId: string, mood: string) => {
   track(patientId, 'mood_checkin', { mood });
+  gtag('event', 'mood_checkin', { mood, user_id: patientId });
+};
 
-export const trackNotificationOpened = (patientId: string, campaignId: string) =>
+export const trackNotificationOpened = (patientId: string, campaignId: string) => {
   track(patientId, 'notification_opened', { campaignId });
+  gtag('event', 'notification_open', { campaign_id: campaignId, user_id: patientId });
+};
 
-export const trackPhotoUploaded = (patientId: string) =>
+export const trackPhotoUploaded = (patientId: string) => {
   track(patientId, 'photo_uploaded');
+  gtag('event', 'photo_upload', { user_id: patientId });
+};
 
-export const trackReferralSent = (patientId: string) =>
+export const trackReferralSent = (patientId: string) => {
   track(patientId, 'referral_sent');
+  gtag('event', 'share', { method: 'referral', user_id: patientId });
+};
 
-export const trackChecklistItem = (patientId: string, list: string, item: string) =>
+export const trackChecklistItem = (patientId: string, list: string, item: string) => {
   track(patientId, 'checklist_item_checked', { list, item });
+  gtag('event', 'checklist_item', { list_name: list, item_name: item, user_id: patientId });
+};
 
 // ── Geolocalização ───────────────────────────────────────────────────────────
 
@@ -142,6 +171,10 @@ export const requestGeolocation = (patientId: string): Promise<PatientLocation |
 
         saveLocation(loc);
         track(patientId, 'location_captured', { city: loc.city, state: loc.state, lat, lng });
+        gtag('event', 'location_captured', {
+          city: loc.city, state: loc.state, country: loc.country,
+          latitude: lat, longitude: lng, user_id: patientId,
+        });
         resolve(loc);
       },
       () => resolve(null),  // permissão negada ou erro
@@ -174,10 +207,13 @@ export const trackSessionStart = async (patientId: string): Promise<void> => {
   if (loc) ctx.location = loc;
 
   appendSession(ctx);
-  track(patientId, 'session_start', {
+  track(patientId, 'session_start', { referrer: ctx.referrer, userAgent: ctx.userAgent });
+  gtag('event', 'session_start', {
     referrer: ctx.referrer,
-    userAgent: ctx.userAgent,
+    user_id: patientId,
   });
+  // Informa o GA4 sobre o usuário atual
+  gtag('config', 'G-XXXXXXXXXX', { user_id: patientId });
 };
 
 export const getSessionContexts = (patientId: string): SessionContext[] =>
