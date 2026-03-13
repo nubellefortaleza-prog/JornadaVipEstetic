@@ -2,17 +2,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // analyticsService.ts — Rastreamento Ético de Comportamento (LGPD Compliant)
 //
-// APENAS rastreia ações que o usuário faz DENTRO do app, com total transparência.
-// Nada é capturado de outros apps, teclado, câmera ou localização sem ação explícita.
-//
-// Sugestões de rastreamento externo ao app (requerem consentimento explícito):
-//   • Google Analytics 4 / Mixpanel — comportamento de navegação no app
-//   • Smartlook (já integrado no index.html) — gravação de tela opt-in
-//   • OneSignal — frequência de abertura de notificações
-//   • Firebase Analytics — sessões, tempo no app, eventos customizados
+// Rastreia apenas ações feitas DENTRO do app, com total transparência.
+// Geolocalização: requer consentimento explícito do navegador (popup do browser).
+// Referrer: URL de onde a paciente veio ao abrir o app (dado público do navegador).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ANALYTICS_KEY = 'clinic_analytics';
+const ANALYTICS_KEY    = 'clinic_analytics';
+const LOCATIONS_KEY    = 'clinic_locations';
+const SESSIONS_KEY     = 'clinic_sessions';
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface AnalyticsEvent {
   patientId: string;
@@ -21,12 +20,35 @@ export interface AnalyticsEvent {
   timestamp: string;
 }
 
+export interface PatientLocation {
+  patientId: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  state?: string;
+  country?: string;
+  capturedAt: string;
+}
+
+export interface SessionContext {
+  patientId: string;
+  referrer: string;
+  userAgent: string;
+  sessionStart: string;
+  location?: PatientLocation;
+}
+
+export interface NavEntry {
+  screen: string;
+  timestamp: string;
+}
+
 export interface PatientEngagement {
   patientId: string;
   totalSessions: number;
   lastSeen: string;
-  screenVisits: Record<string, number>;     // ex: { dashboard: 12, evolution: 3 }
-  featuresUsed: string[];                   // ex: ['checklist_post', 'mood_checkin']
+  screenVisits: Record<string, number>;
+  featuresUsed: string[];
   checklistCompletions: number;
   photosUploaded: number;
   moodHistory: { mood: string; date: string }[];
@@ -41,12 +63,28 @@ const getEvents = (): AnalyticsEvent[] =>
 
 const appendEvent = (event: AnalyticsEvent) => {
   const events = getEvents();
-  // Mantém últimos 500 eventos para não estourar o localStorage
   const trimmed = events.length >= 500 ? events.slice(-499) : events;
   localStorage.setItem(ANALYTICS_KEY, JSON.stringify([...trimmed, event]));
 };
 
-// ── API Pública ──────────────────────────────────────────────────────────────
+const getLocations = (): PatientLocation[] =>
+  JSON.parse(localStorage.getItem(LOCATIONS_KEY) || '[]');
+
+const saveLocation = (loc: PatientLocation) => {
+  const all = getLocations().filter(l => l.patientId !== loc.patientId);
+  localStorage.setItem(LOCATIONS_KEY, JSON.stringify([...all, loc]));
+};
+
+const getSessions = (): SessionContext[] =>
+  JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]');
+
+const appendSession = (ctx: SessionContext) => {
+  const sessions = getSessions();
+  const trimmed = sessions.length >= 200 ? sessions.slice(-199) : sessions;
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify([...trimmed, ctx]));
+};
+
+// ── API Pública — Eventos ────────────────────────────────────────────────────
 
 export const track = (patientId: string, event: string, metadata?: Record<string, any>) => {
   appendEvent({ patientId, event, metadata, timestamp: new Date().toISOString() });
@@ -73,7 +111,90 @@ export const trackReferralSent = (patientId: string) =>
 export const trackChecklistItem = (patientId: string, list: string, item: string) =>
   track(patientId, 'checklist_item_checked', { list, item });
 
-// ── Consolidar Engajamento de um Paciente ────────────────────────────────────
+// ── Geolocalização ───────────────────────────────────────────────────────────
+
+/**
+ * Solicita permissão de localização ao browser.
+ * Se concedida, faz reverse geocoding via Nominatim (sem API key).
+ * Salva cidade, estado e país vinculado ao patientId.
+ */
+export const requestGeolocation = (patientId: string): Promise<PatientLocation | null> => {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const loc: PatientLocation = { patientId, lat, lng, capturedAt: new Date().toISOString() };
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt`,
+            { headers: { 'Accept-Language': 'pt' } }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            loc.city    = data.address?.city || data.address?.town || data.address?.village || data.address?.county;
+            loc.state   = data.address?.state;
+            loc.country = data.address?.country;
+          }
+        } catch (_) { /* sem reverse geocoding, mantém só lat/lng */ }
+
+        saveLocation(loc);
+        track(patientId, 'location_captured', { city: loc.city, state: loc.state, lat, lng });
+        resolve(loc);
+      },
+      () => resolve(null),  // permissão negada ou erro
+      { timeout: 10000, maximumAge: 3600000 }
+    );
+  });
+};
+
+export const getLocation = (patientId: string): PatientLocation | null =>
+  getLocations().find(l => l.patientId === patientId) ?? null;
+
+// ── Contexto de Sessão ───────────────────────────────────────────────────────
+
+/**
+ * Registra o início de uma sessão da paciente:
+ * - Referrer (de onde ela veio ao abrir o app)
+ * - User-Agent do dispositivo
+ * - Solicita geolocalização
+ */
+export const trackSessionStart = async (patientId: string): Promise<void> => {
+  const ctx: SessionContext = {
+    patientId,
+    referrer: document.referrer || 'direto',
+    userAgent: navigator.userAgent,
+    sessionStart: new Date().toISOString(),
+  };
+
+  // Tenta geolocalização (não-bloqueante)
+  const loc = await requestGeolocation(patientId);
+  if (loc) ctx.location = loc;
+
+  appendSession(ctx);
+  track(patientId, 'session_start', {
+    referrer: ctx.referrer,
+    userAgent: ctx.userAgent,
+  });
+};
+
+export const getSessionContexts = (patientId: string): SessionContext[] =>
+  getSessions().filter(s => s.patientId === patientId);
+
+// ── Histórico de Navegação ───────────────────────────────────────────────────
+
+/**
+ * Retorna a trilha de navegação da paciente dentro do app,
+ * em ordem cronológica.
+ */
+export const getNavHistory = (patientId: string): NavEntry[] =>
+  getEvents()
+    .filter(e => e.patientId === patientId && e.event === 'screen_view' && e.metadata?.screen)
+    .map(e => ({ screen: e.metadata!.screen as string, timestamp: e.timestamp }));
+
+// ── Consolidar Engajamento ───────────────────────────────────────────────────
 
 export const getEngagement = (patientId: string): PatientEngagement => {
   const events = getEvents().filter(e => e.patientId === patientId);
@@ -94,9 +215,7 @@ export const getEngagement = (patientId: string): PatientEngagement => {
       screenVisits[e.metadata.screen] = (screenVisits[e.metadata.screen] || 0) + 1;
       if (e.metadata.screen === 'dashboard') sessions++;
     }
-    if (e.event === 'feature_used' && e.metadata?.feature) {
-      featuresUsed.add(e.metadata.feature);
-    }
+    if (e.event === 'feature_used' && e.metadata?.feature) featuresUsed.add(e.metadata.feature);
     if (e.event === 'mood_checkin' && e.metadata?.mood) {
       moodHistory.push({ mood: e.metadata.mood, date: e.timestamp });
     }
@@ -119,8 +238,6 @@ export const getEngagement = (patientId: string): PatientEngagement => {
     referralsSent,
   };
 };
-
-// ── Resumo de Todos os Pacientes (para o Admin) ──────────────────────────────
 
 export const getAllEngagements = (patientIds: string[]): PatientEngagement[] =>
   patientIds.map(getEngagement);

@@ -9,7 +9,7 @@ import {
   saveCampaigns,
   showBrowserNotification,
 } from '../services/notificationService';
-import { getEngagement } from '../services/analyticsService';
+import { getEngagement, getLocation, getSessionContexts, getNavHistory } from '../services/analyticsService';
 
 interface Props {
   onBack: () => void;
@@ -419,7 +419,7 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
       {activeTab === 'analytics' && (
         <div className="space-y-4">
           <p className="text-xs text-white/40 leading-relaxed">
-            Rastreamento ético e LGPD-compliant — apenas ações feitas <span className="sage-green font-bold">dentro do app</span> pelo próprio paciente.
+            Rastreamento LGPD-compliant — ações dentro do app + localização com consentimento.
           </p>
           {records.length === 0 ? (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
@@ -427,18 +427,26 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
             </div>
           ) : (
             records.map(r => {
-              const eng = getEngagement(r.profile.id);
+              const eng      = getEngagement(r.profile.id);
+              const loc      = getLocation(r.profile.id);
+              const sessions = getSessionContexts(r.profile.id);
+              const navHist  = getNavHistory(r.profile.id);
               const topScreens = Object.entries(eng.screenVisits).sort((a, b) => b[1] - a[1]).slice(0, 3);
+              const lastSession = sessions[sessions.length - 1];
+
               return (
-                <div key={r.profile.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div key={r.profile.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                  {/* Cabeçalho */}
                   <div className="flex justify-between items-center">
                     <p className="font-medium">{r.profile.name}</p>
                     {eng.lastSeen && (
                       <span className="text-[9px] text-white/30">
-                        Último acesso: {new Date(eng.lastSeen).toLocaleDateString('pt-BR')}
+                        {new Date(eng.lastSeen).toLocaleDateString('pt-BR')}
                       </span>
                     )}
                   </div>
+
+                  {/* Métricas */}
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { label: 'Sessões', value: eng.totalSessions },
@@ -452,6 +460,39 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
                       </div>
                     ))}
                   </div>
+
+                  {/* Localização */}
+                  {loc ? (
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3">
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Localização</p>
+                      <p className="text-xs font-medium">
+                        {[loc.city, loc.state, loc.country].filter(Boolean).join(', ') || 'Localização capturada'}
+                      </p>
+                      <p className="text-[9px] text-white/30 mt-0.5">
+                        {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)} · {new Date(loc.capturedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-black/20 border border-white/5 rounded-xl p-3">
+                      <p className="text-[9px] text-white/20 uppercase tracking-wider mb-0.5">Localização</p>
+                      <p className="text-[10px] text-white/30">Aguardando permissão da paciente no próximo acesso</p>
+                    </div>
+                  )}
+
+                  {/* Origem / Referrer */}
+                  {lastSession && (
+                    <div className="bg-black/30 border border-white/10 rounded-xl p-3 space-y-1">
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1">Origem da Visita</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] bg-sage/10 text-sage px-2 py-0.5 rounded-full max-w-full truncate">
+                          {lastSession.referrer === 'direto' ? '🔗 Acesso direto (digitou URL ou app)' : `↩ ${lastSession.referrer}`}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-white/20 truncate">{lastSession.userAgent}</p>
+                    </div>
+                  )}
+
+                  {/* Telas mais acessadas */}
                   {topScreens.length > 0 && (
                     <div>
                       <p className="text-[9px] text-white/30 mb-1">Telas mais acessadas</p>
@@ -464,6 +505,25 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Histórico de navegação no app */}
+                  {navHist.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-2">Histórico de Navegação no App</p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                        {navHist.slice(-20).reverse().map((entry, i) => (
+                          <div key={i} className="flex items-center justify-between bg-black/20 rounded-lg px-3 py-1.5">
+                            <span className="text-[10px] text-white/70 capitalize">{entry.screen}</span>
+                            <span className="text-[9px] text-white/30">
+                              {new Date(entry.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Últimos humores */}
                   {eng.moodHistory.length > 0 && (
                     <div>
                       <p className="text-[9px] text-white/30 mb-1">Últimos humores</p>
@@ -482,7 +542,7 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
           <div className="bg-sage/5 border border-sage/20 rounded-2xl p-4 mt-2">
             <p className="text-[10px] sage-green font-bold uppercase tracking-wider mb-2">Para analytics mais avançados</p>
             <p className="text-xs text-white/50 leading-relaxed">
-              Integre com <strong className="text-white/70">Google Analytics 4</strong>, <strong className="text-white/70">Mixpanel</strong> ou <strong className="text-white/70">Firebase</strong> para dados de sessão, funil de conversão e retenção. O Smartlook (já integrado) também captura gravações de tela com consentimento.
+              Integre com <strong className="text-white/70">Google Analytics 4</strong>, <strong className="text-white/70">Mixpanel</strong> ou <strong className="text-white/70">Firebase</strong> para funil de conversão e retenção. O Smartlook (já integrado) captura gravações de tela com consentimento.
             </p>
           </div>
         </div>
