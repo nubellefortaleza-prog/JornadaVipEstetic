@@ -39,6 +39,19 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
   const [campSelectedIds, setCampSelectedIds] = useState<string[]>([]);
   const [campScheduled, setCampScheduled] = useState('');
 
+  // ── Cadastro / Edição de Paciente ──────────────────────────────────────────
+  const [showPatientForm, setShowPatientForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [fName, setFName]             = useState('');
+  const [fPhone, setFPhone]           = useState('');
+  const [fEmail, setFEmail]           = useState('');
+  const [fCpf, setFCpf]               = useState('');
+  const [fBirth, setFBirth]           = useState('');
+  const [fCity, setFCity]             = useState('');
+  const [fObjective, setFObjective]   = useState('');
+  const [fStyle, setFStyle]           = useState<'natural' | 'marcante' | 'discreto'>('natural');
+  const [fComm, setFComm]             = useState<'tecnico' | 'simples'>('simples');
+
   // ── Webhooks ───────────────────────────────────────────────────────────────
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>(getWebhooks);
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
@@ -50,6 +63,65 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
     setRecords(data);
     setCampaigns(getCampaigns());
   }, []);
+
+  // ── Helpers: Formulário de Paciente ───────────────────────────────────────
+  const clearPatientForm = () => {
+    setFName(''); setFPhone(''); setFEmail(''); setFCpf('');
+    setFBirth(''); setFCity(''); setFObjective('');
+    setFStyle('natural'); setFComm('simples');
+    setEditingId(null); setShowPatientForm(false);
+  };
+
+  const openEditForm = (r: PatientRecord) => {
+    setFName(r.profile.name);
+    setFPhone(r.profile.phone);
+    setFEmail(r.profile.email);
+    setFCpf(r.profile.cpf);
+    setFBirth(r.profile.birthDate);
+    setFCity(r.profile.city);
+    setFObjective(r.profile.objective);
+    setFStyle(r.profile.style);
+    setFComm(r.profile.commPreference);
+    setEditingId(r.profile.id);
+    setShowPatientForm(true);
+    setSelectedRecord(null);
+  };
+
+  const handleSavePatient = () => {
+    if (!fName || !fPhone) return;
+    const all: PatientRecord[] = JSON.parse(localStorage.getItem('clinic_records') || '[]');
+
+    if (editingId) {
+      // Edição
+      const updated = all.map(r =>
+        r.profile.id === editingId
+          ? { ...r, profile: { ...r.profile, name: fName, phone: fPhone, email: fEmail, cpf: fCpf, birthDate: fBirth, city: fCity, objective: fObjective, style: fStyle, commPreference: fComm } }
+          : r
+      );
+      localStorage.setItem('clinic_records', JSON.stringify(updated));
+      setRecords(updated);
+    } else {
+      // Novo cadastro
+      const emptyAnamnesis = { healthGeneral: '', allergies: '', medications: '', pregnancy: false, pastProcedures: '', habits: { sun: '', sleep: '', smoking: false, skincare: '' }, expectedResult: '' };
+      const newRecord: PatientRecord = {
+        profile: { id: Math.random().toString(36).substr(2, 9), name: fName, phone: fPhone, email: fEmail, cpf: fCpf, birthDate: fBirth, city: fCity, objective: fObjective, style: fStyle, commPreference: fComm, createdAt: new Date().toISOString() },
+        anamnesis: emptyAnamnesis,
+        reminders: [],
+      };
+      const updated = [...all, newRecord];
+      localStorage.setItem('clinic_records', JSON.stringify(updated));
+      setRecords(updated);
+    }
+    clearPatientForm();
+  };
+
+  const handleDeletePatient = (id: string) => {
+    if (!confirm('Remover este paciente permanentemente?')) return;
+    const updated = records.filter(r => r.profile.id !== id);
+    localStorage.setItem('clinic_records', JSON.stringify(updated));
+    setRecords(updated);
+    if (selectedRecord?.profile.id === id) setSelectedRecord(null);
+  };
 
   // ── Handlers: Pacientes ────────────────────────────────────────────────────
   const handleViewPatient = async (record: PatientRecord) => {
@@ -192,24 +264,80 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
         <>
           {!selectedRecord ? (
             <div className="space-y-4">
-              <h3 className="text-xs uppercase tracking-widest text-white/40 ml-1">Fichas Cadastradas</h3>
+
+              {/* Botão + Formulário de Cadastro/Edição */}
+              {!showPatientForm ? (
+                <button
+                  onClick={() => { clearPatientForm(); setShowPatientForm(true); }}
+                  className="w-full py-3 border border-sage/40 rounded-2xl text-xs font-bold sage-green hover:bg-sage/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="text-lg leading-none">+</span> Novo Cadastro
+                </button>
+              ) : (
+                <div className="bg-white/5 border border-sage/30 rounded-3xl p-5 space-y-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-sage">
+                      {editingId ? 'Editar Paciente' : 'Novo Cadastro'}
+                    </h4>
+                    <button onClick={clearPatientForm} className="text-white/30 hover:text-white/60 text-lg leading-none">✕</button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="col-span-2 w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Nome completo *" value={fName} onChange={e => setFName(e.target.value)} />
+                    <input className="bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-sage" placeholder="Telefone *" value={fPhone} onChange={e => setFPhone(e.target.value)} />
+                    <input className="bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-sage" placeholder="E-mail" value={fEmail} onChange={e => setFEmail(e.target.value)} />
+                    <input className="bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-sage" placeholder="CPF" value={fCpf} onChange={e => setFCpf(e.target.value)} />
+                    <input type="date" className="bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-sage" value={fBirth} onChange={e => setFBirth(e.target.value)} />
+                    <input className="col-span-2 w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Cidade" value={fCity} onChange={e => setFCity(e.target.value)} />
+                    <input className="col-span-2 w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Objetivo (ex: Lifting facial, Harmonização...)" value={fObjective} onChange={e => setFObjective(e.target.value)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[9px] text-white/30 mb-1">Estilo</p>
+                      <div className="flex gap-1">
+                        {(['natural', 'marcante', 'discreto'] as const).map(s => (
+                          <button key={s} onClick={() => setFStyle(s)} className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold capitalize transition-all ${fStyle === s ? 'bg-sage text-[#1A1A1B]' : 'bg-white/5 text-white/40'}`}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-white/30 mb-1">Comunicação</p>
+                      <div className="flex gap-1">
+                        {(['simples', 'tecnico'] as const).map(c => (
+                          <button key={c} onClick={() => setFComm(c)} className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold capitalize transition-all ${fComm === c ? 'bg-sage text-[#1A1A1B]' : 'bg-white/5 text-white/40'}`}>{c}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button onClick={handleSavePatient} disabled={!fName || !fPhone} className="w-full py-2.5 bg-sage text-[#1A1A1B] text-xs font-bold rounded-xl disabled:opacity-30 transition-all">
+                    {editingId ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+                  </button>
+                </div>
+              )}
+
+              {/* Lista de pacientes */}
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-xs uppercase tracking-widest text-white/40">Fichas Cadastradas ({records.length})</h3>
+              </div>
               {records.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
                   <p className="text-sm text-white/40">Aguardando novos cadastros...</p>
                 </div>
               ) : (
                 records.map((r, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleViewPatient(r)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between hover:border-sage/50 transition-all"
-                  >
-                    <div className="text-left">
+                  <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between hover:border-sage/20 transition-all">
+                    <button onClick={() => handleViewPatient(r)} className="flex-1 text-left">
                       <p className="font-medium">{r.profile.name}</p>
-                      <p className="text-[10px] text-white/40 uppercase tracking-tighter">{r.profile.objective}</p>
+                      <p className="text-[10px] text-white/40">{r.profile.phone}{r.profile.city ? ` · ${r.profile.city}` : ''}</p>
+                      {r.profile.objective && <p className="text-[9px] text-white/25 uppercase tracking-tighter mt-0.5">{r.profile.objective}</p>}
+                    </button>
+                    <div className="flex items-center gap-3 ml-3">
+                      <button onClick={() => openEditForm(r)} className="text-[10px] text-white/30 hover:text-sage transition-colors font-bold">Editar</button>
+                      <button onClick={() => handleDeletePatient(r.profile.id)} className="text-[10px] text-red-400/40 hover:text-red-400 transition-colors font-bold">✕</button>
                     </div>
-                    <span className="text-[10px] sage-green font-bold">Abrir IA</span>
-                  </button>
+                  </div>
                 ))
               )}
             </div>
@@ -223,9 +351,17 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
               </button>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                <p className="font-semibold">{selectedRecord.profile.name}</p>
-                <p className="text-xs text-white/40">{selectedRecord.profile.phone} • {selectedRecord.profile.email}</p>
-                <p className="text-xs text-white/40 mt-1">Objetivo: {selectedRecord.profile.objective}</p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">{selectedRecord.profile.name}</p>
+                    <p className="text-xs text-white/40">{selectedRecord.profile.phone} • {selectedRecord.profile.email}</p>
+                    {selectedRecord.profile.city && <p className="text-xs text-white/30">{selectedRecord.profile.city}</p>}
+                    <p className="text-xs text-white/40 mt-1">Objetivo: {selectedRecord.profile.objective}</p>
+                  </div>
+                  <button onClick={() => openEditForm(selectedRecord)} className="text-[10px] sage-green font-bold border border-sage/30 px-3 py-1 rounded-lg hover:bg-sage/10 transition-all">
+                    Editar
+                  </button>
+                </div>
               </div>
 
               {/* Lembrete / Popup interno */}
