@@ -115,7 +115,7 @@ const App: React.FC = () => {
       case AppStep.LOGIN:
         return (
           <LoginView
-            onLogin={() => handleNextStep(AppStep.TERMS)}
+            onLogin={() => handleNextStep(AppStep.PROFILE_SETUP)}
             onAdminLogin={() => handleNextStep(AppStep.ADMIN_LOGIN)}
           />
         );
