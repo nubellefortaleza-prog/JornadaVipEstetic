@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { PatientRecord, Reminder } from '../types';
+import { PatientRecord, Reminder, AdminUser } from '../types';
 import { getGeminiSummaryForClinic } from '../services/geminiService';
 import { getWebhooks, saveWebhooks, sendPatientToWebhooks, WebhookConfig } from '../services/webhookService';
 import {
@@ -10,14 +10,16 @@ import {
   showBrowserNotification,
 } from '../services/notificationService';
 import { getEngagement, getLocation, getSessionContexts, getNavHistory } from '../services/analyticsService';
+import { getAdminUsers, saveAdminUsers } from '../services/adminAuthService';
 
 interface Props {
+  currentAdmin: AdminUser;
   onBack: () => void;
 }
 
-type AdminTab = 'pacientes' | 'campanhas' | 'integracoes' | 'analytics';
+type AdminTab = 'pacientes' | 'campanhas' | 'integracoes' | 'analytics' | 'usuarios';
 
-const AdminView: React.FC<Props> = ({ onBack }) => {
+const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('pacientes');
 
   // ── Pacientes ──────────────────────────────────────────────────────────────
@@ -227,11 +229,54 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
     setWebhooks(updated); saveWebhooks(updated);
   };
 
+  // ── Estado: Usuários ──────────────────────────────────────────────────────
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>(getAdminUsers);
+  const [showUserForm, setShowUserForm]     = useState(false);
+  const [editingUserId, setEditingUserId]   = useState<string | null>(null);
+  const [uName, setUName]                   = useState('');
+  const [uUsername, setUUsername]           = useState('');
+  const [uPassword, setUPassword]           = useState('');
+  const [uRole, setURole]                   = useState<'master' | 'colaborador'>('colaborador');
+
+  const clearUserForm = () => {
+    setUName(''); setUUsername(''); setUPassword(''); setURole('colaborador');
+    setEditingUserId(null); setShowUserForm(false);
+  };
+
+  const openEditUser = (u: AdminUser) => {
+    setUName(u.name); setUUsername(u.username); setUPassword(u.password); setURole(u.role);
+    setEditingUserId(u.id); setShowUserForm(true);
+  };
+
+  const handleSaveUser = () => {
+    if (!uName || !uUsername || !uPassword) return;
+    let updated: AdminUser[];
+    if (editingUserId) {
+      updated = adminUsers.map(u => u.id === editingUserId ? { ...u, name: uName, username: uUsername, password: uPassword, role: uRole } : u);
+    } else {
+      const newUser: AdminUser = { id: Math.random().toString(36).substr(2, 9), name: uName, username: uUsername, password: uPassword, role: uRole, createdAt: new Date().toISOString() };
+      updated = [...adminUsers, newUser];
+    }
+    saveAdminUsers(updated);
+    setAdminUsers(updated);
+    clearUserForm();
+  };
+
+  const handleDeleteUser = (id: string) => {
+    if (id === currentAdmin.id) { alert('Você não pode remover sua própria conta.'); return; }
+    if (!confirm('Remover este usuário?')) return;
+    const updated = adminUsers.filter(u => u.id !== id);
+    saveAdminUsers(updated);
+    setAdminUsers(updated);
+  };
+
+  // ── Tabs (Usuários só para master) ────────────────────────────────────────
   const tabs: { key: AdminTab; label: string }[] = [
     { key: 'pacientes', label: 'Pacientes' },
     { key: 'campanhas', label: 'Campanhas' },
     { key: 'analytics', label: 'Analytics' },
     { key: 'integracoes', label: 'CRM' },
+    ...(currentAdmin.role === 'master' ? [{ key: 'usuarios' as AdminTab, label: 'Usuários' }] : []),
   ];
 
   return (
@@ -239,13 +284,18 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-2xl font-serif">Painel Clínico</h2>
-          <p className="text-xs text-white/40">Gestão e Inteligência</p>
+          <p className="text-xs text-white/40">
+            {currentAdmin.name}
+            <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] border border-sage/30 sage-green uppercase">
+              {currentAdmin.role}
+            </span>
+          </p>
         </div>
         <button onClick={onBack} className="text-xs sage-green uppercase tracking-widest font-bold">Sair</button>
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1 mb-6">
+      <div className={`grid gap-1 mb-6 ${tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {tabs.map(t => (
           <button
             key={t.key}
@@ -745,6 +795,76 @@ const AdminView: React.FC<Props> = ({ onBack }) => {
               Dados enviados: nome, telefone, e-mail, objetivo e anamnese do paciente via POST JSON. Compatível com Zapier, Make (Integromat), n8n, RD Station, Ploomes e qualquer sistema com webhook.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── ABA: USUÁRIOS ────────────────────────────────────────────────────── */}
+      {activeTab === 'usuarios' && currentAdmin.role === 'master' && (
+        <div className="space-y-4">
+
+          {/* Formulário */}
+          {!showUserForm ? (
+            <button
+              onClick={() => { clearUserForm(); setShowUserForm(true); }}
+              className="w-full py-3 border border-sage/40 rounded-2xl text-xs font-bold sage-green hover:bg-sage/10 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="text-lg leading-none">+</span> Novo Usuário
+            </button>
+          ) : (
+            <div className="bg-white/5 border border-sage/30 rounded-3xl p-5 space-y-3">
+              <div className="flex justify-between items-center mb-1">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-sage">
+                  {editingUserId ? 'Editar Usuário' : 'Novo Usuário'}
+                </h4>
+                <button onClick={clearUserForm} className="text-white/30 hover:text-white/60 text-lg leading-none">✕</button>
+              </div>
+
+              <input className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Nome completo *" value={uName} onChange={e => setUName(e.target.value)} />
+              <input className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Usuário (login) *" value={uUsername} onChange={e => setUUsername(e.target.value)} autoComplete="off" />
+              <input type="password" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:border-sage" placeholder="Senha *" value={uPassword} onChange={e => setUPassword(e.target.value)} autoComplete="new-password" />
+
+              <div>
+                <p className="text-[9px] text-white/30 mb-1">Perfil de acesso</p>
+                <div className="flex gap-2">
+                  {(['colaborador', 'master'] as const).map(r => (
+                    <button key={r} onClick={() => setURole(r)} className={`flex-1 py-2 rounded-xl text-[10px] font-bold capitalize transition-all ${uRole === r ? 'bg-sage text-[#1A1A1B]' : 'bg-white/5 text-white/40'}`}>
+                      {r === 'master' ? '★ Master' : 'Colaborador'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-white/25 mt-1">
+                  {uRole === 'master' ? 'Acesso total, incluindo gestão de usuários.' : 'Acesso às abas Pacientes, Campanhas, Analytics e CRM.'}
+                </p>
+              </div>
+
+              <button onClick={handleSaveUser} disabled={!uName || !uUsername || !uPassword} className="w-full py-2.5 bg-sage text-[#1A1A1B] text-xs font-bold rounded-xl disabled:opacity-30 transition-all">
+                {editingUserId ? 'Salvar Alterações' : 'Criar Usuário'}
+              </button>
+            </div>
+          )}
+
+          {/* Lista de usuários */}
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs uppercase tracking-widest text-white/40">Usuários Cadastrados ({adminUsers.length})</h3>
+          </div>
+          {adminUsers.map((u) => (
+            <div key={u.id} className={`bg-white/5 border rounded-2xl p-4 flex items-center justify-between transition-all ${u.id === currentAdmin.id ? 'border-sage/30' : 'border-white/10'}`}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm">{u.name}</p>
+                  {u.id === currentAdmin.id && <span className="text-[8px] sage-green bg-sage/10 px-1.5 py-0.5 rounded">você</span>}
+                </div>
+                <p className="text-[10px] text-white/40">@{u.username}</p>
+                <span className={`text-[9px] font-bold uppercase ${u.role === 'master' ? 'sage-green' : 'text-white/30'}`}>{u.role === 'master' ? '★ Master' : 'Colaborador'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => openEditUser(u)} className="text-[10px] text-white/30 hover:text-sage transition-colors font-bold">Editar</button>
+                {u.id !== currentAdmin.id && (
+                  <button onClick={() => handleDeleteUser(u.id)} className="text-[10px] text-red-400/40 hover:text-red-400 transition-colors font-bold">✕</button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
