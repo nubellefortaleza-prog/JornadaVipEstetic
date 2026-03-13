@@ -10,7 +10,17 @@ export enum AppStep {
   REWARDS,
   EVOLUTION,
   COMMUNITY,
+  ADMIN_LOGIN,
   ADMIN
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  username: string;
+  password: string;
+  role: 'master' | 'colaborador';
+  createdAt: string;
 }
 
 export interface Reminder {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord } from './types';
+import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord, AdminUser } from './types';
 import LoginView from './components/LoginView';
 import TermsView from './components/TermsView';
 import ProfileSetupView from './components/ProfileSetupView';
@@ -8,12 +8,14 @@ import AnamnesisView from './components/AnamnesisView';
 import DashboardView from './components/DashboardView';
 import GeminiChat from './components/GeminiChat';
 import AdminView from './components/AdminView';
+import AdminLoginView from './components/AdminLoginView';
 import RewardsView from './components/RewardsView';
 import PreProcedureView from './components/PreProcedureView';
 import PostProcedureView from './components/PostProcedureView';
 import EvolutionView from './components/EvolutionView';
 import { registerServiceWorker } from './services/notificationService';
 import { trackScreen, trackSessionStart } from './services/analyticsService';
+import { clearAdminSession } from './services/adminAuthService';
 
 // Tipagem para o Smartlook no window
 declare global {
@@ -24,6 +26,7 @@ declare global {
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.LOGIN);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [anamnesis, setAnamnesis] = useState<AnamnesisData | null>(null);
   const [rewards, setRewards] = useState<RewardPoints>({
@@ -113,7 +116,14 @@ const App: React.FC = () => {
         return (
           <LoginView
             onLogin={() => handleNextStep(AppStep.TERMS)}
-            onAdminLogin={() => handleNextStep(AppStep.ADMIN)}
+            onAdminLogin={() => handleNextStep(AppStep.ADMIN_LOGIN)}
+          />
+        );
+      case AppStep.ADMIN_LOGIN:
+        return (
+          <AdminLoginView
+            onSuccess={(user) => { setCurrentAdmin(user); handleNextStep(AppStep.ADMIN); }}
+            onBack={() => setStep(AppStep.LOGIN)}
           />
         );
       case AppStep.TERMS:
@@ -153,7 +163,12 @@ const App: React.FC = () => {
       case AppStep.EVOLUTION:
         return <EvolutionView onBack={() => setStep(AppStep.DASHBOARD)} />;
       case AppStep.ADMIN:
-        return <AdminView onBack={() => setStep(AppStep.LOGIN)} />;
+        return (
+          <AdminView
+            currentAdmin={currentAdmin!}
+            onBack={() => { clearAdminSession(); setCurrentAdmin(null); setStep(AppStep.LOGIN); }}
+          />
+        );
       default:
         return (
           <DashboardView
