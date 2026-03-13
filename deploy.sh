@@ -3,16 +3,15 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DIST_DIR="$PROJECT_DIR/dist"
+BRANCH="main"
 
 echo "==> Atualizando código..."
-git -C "$PROJECT_DIR" pull origin main
-
-echo "==> Instalando dependências..."
-npm --prefix "$PROJECT_DIR" install
+git -C "$PROJECT_DIR" pull origin "$BRANCH"
 
 echo "==> Gerando build..."
 npm --prefix "$PROJECT_DIR" run build
 
-echo "==> Deploy concluído! Arquivos em: $DIST_DIR"
-echo "Lembre-se: o nginx deve apontar para $DIST_DIR"
+echo "==> Reiniciando app..."
+pm2 restart all
+
+echo "==> Deploy concluído!"
