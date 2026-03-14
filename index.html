@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jornada VIP Estética</title>
+
+    <!-- PWA: instalação como atalho + notificações push -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#AABAA4">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VIP Estética">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', sans-serif;
+        background-color: #1A1A1B;
+        color: #FFFFFF;
+        overflow-x: hidden;
+      }
+      .font-serif {
+        font-family: 'Playfair Display', serif;
+      }
+      /* Custom background gradient */
+      .bg-premium-noir {
+        background: radial-gradient(circle at bottom right, rgba(170, 186, 164, 0.15) 0%, rgba(26, 26, 27, 1) 70%);
+      }
+      .sage-green {
+        color: #AABAA4;
+      }
+      .bg-sage {
+        background-color: #AABAA4;
+      }
+      .border-sage {
+        border-color: #AABAA4;
+      }
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1A1A1B;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #AABAA4;
+        border-radius: 10px;
+      }
+    </style>
+
+    <!-- Google Analytics 4 — substitua G-XXXXXXXXXX pelo seu Measurement ID -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX', {
+        send_page_view: false   // page_view manual via analyticsService
+      });
+    </script>
+
+    <!-- Smartlook Script -->
+    <script type='text/javascript'>
+      window.smartlook||(function(d) {
+        var o=smartlook=function(){ o.api.push(arguments)},h=d.getElementsByTagName('head')[0];
+        var c=d.createElement('script');o.api=new Array();c.async=true;c.type='text/javascript';
+        c.charset='utf-8';c.src='https://web-sdk.smartlook.com/recorder.js';h.appendChild(c);
+        })(document);
+        // Substitua 'YOUR_PROJECT_KEY' pela sua chave real do painel Smartlook
+        smartlook('init', 'YOUR_PROJECT_KEY', { region: 'eu' });
+    </script>
+
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.39.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
