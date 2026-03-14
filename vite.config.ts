@@ -11,8 +11,10 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // Gemini API key é exposta APENAS em modo dev (sem backend).
+        // Em produção, defina VITE_API_BASE_URL e as chamadas vão pelo proxy do CRM.
+        // A key fica acessível via import.meta.env.VITE_GEMINI_API_KEY automaticamente.
+        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || ''),
       },
       resolve: {
         alias: {
