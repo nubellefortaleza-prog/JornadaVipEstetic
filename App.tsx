@@ -1,153 +1,278 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// validation.ts — Validação e sanitização de dados
-//
-// Previne XSS, injection e dados mal-formados antes de salvar/enviar.
-// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Sanitização ─────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useCallback } from 'react';
+import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord, AdminUser } from './types';
+import LoginView from './components/LoginView';
+import TermsView from './components/TermsView';
+import ProfileSetupView from './components/ProfileSetupView';
+import AnamnesisView from './components/AnamnesisView';
+import DashboardView from './components/DashboardView';
+import GeminiChat from './components/GeminiChat';
+import AdminView from './components/AdminView';
+import AdminLoginView from './components/AdminLoginView';
+import RewardsView from './components/RewardsView';
+import PreProcedureView from './components/PreProcedureView';
+import PostProcedureView from './components/PostProcedureView';
+import EvolutionView from './components/EvolutionView';
+import ErrorBoundary from './components/ErrorBoundary';
+import { registerServiceWorker } from './services/notificationService';
+import { trackScreen, trackSessionStart } from './services/analyticsService';
+import { clearAdminSession } from './services/adminAuthService';
+import * as api from './services/apiService';
 
-/** Remove tags HTML e scripts do texto */
-export const sanitizeText = (input: string): string => {
-  if (!input || typeof input !== 'string') return '';
-  return input
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    .trim();
-};
-
-/** Sanitiza um objeto recursivamente */
-export const sanitizeObject = <T extends Record<string, any>>(obj: T): T => {
-  const clean = { ...obj };
-  for (const key of Object.keys(clean)) {
-    if (typeof clean[key] === 'string') {
-      (clean as any)[key] = sanitizeText(clean[key]);
-    } else if (typeof clean[key] === 'object' && clean[key] !== null && !Array.isArray(clean[key])) {
-      (clean as any)[key] = sanitizeObject(clean[key]);
-    }
+// Tipagem para o Smartlook no window
+declare global {
+  interface Window {
+    smartlook: any;
   }
-  return clean;
-};
-
-// ── Validações de formato ───────────────────────────────────────────────────
-
-export const isValidEmail = (email: string): boolean =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-export const isValidPhone = (phone: string): boolean =>
-  /^\d{10,11}$/.test(phone.replace(/\D/g, ''));
-
-export const isValidCPF = (cpf: string): boolean => {
-  const digits = cpf.replace(/\D/g, '');
-  if (digits.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(digits)) return false; // todos iguais
-  // Validação dos dígitos verificadores
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
-  let remainder = (sum * 10) % 11;
-  if (remainder === 10) remainder = 0;
-  if (remainder !== parseInt(digits[9])) return false;
-  sum = 0;
-  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
-  remainder = (sum * 10) % 11;
-  if (remainder === 10) remainder = 0;
-  return remainder === parseInt(digits[10]);
-};
-
-export const isValidDate = (date: string): boolean => {
-  const d = new Date(date);
-  return !isNaN(d.getTime()) && d < new Date();
-};
-
-export const isValidUrl = (url: string): boolean => {
-  try {
-    const parsed = new URL(url);
-    return ['http:', 'https:'].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
-};
-
-// ── Validação de perfil do paciente ─────────────────────────────────────────
-
-export interface ValidationError {
-  field: string;
-  message: string;
 }
 
-export const validatePatientProfile = (data: Record<string, any>): ValidationError[] => {
-  const errors: ValidationError[] = [];
+const App: React.FC = () => {
+  const [step, setStep] = useState<AppStep>(AppStep.LOGIN);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
+  const [profile, setProfile] = useState<PatientProfile | null>(null);
+  const [anamnesis, setAnamnesis] = useState<AnamnesisData | null>(null);
+  const [rewards, setRewards] = useState<RewardPoints>({
+    total: 150,
+    referralsCount: 2,
+    registeredCount: 1,
+    level: 'Iniciante'
+  });
+  const [showChat, setShowChat] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  if (!data.name || data.name.trim().length < 3) {
-    errors.push({ field: 'name', message: 'Nome deve ter pelo menos 3 caracteres' });
-  }
-  if (data.name && data.name.length > 100) {
-    errors.push({ field: 'name', message: 'Nome deve ter no máximo 100 caracteres' });
-  }
-  if (!data.phone || !isValidPhone(data.phone)) {
-    errors.push({ field: 'phone', message: 'Telefone inválido (DDD + número)' });
-  }
-  if (!data.cpf || !isValidCPF(data.cpf)) {
-    errors.push({ field: 'cpf', message: 'CPF inválido' });
-  }
-  if (!data.email || !isValidEmail(data.email)) {
-    errors.push({ field: 'email', message: 'E-mail inválido' });
-  }
-  if (!data.birthDate || !isValidDate(data.birthDate)) {
-    errors.push({ field: 'birthDate', message: 'Data de nascimento inválida' });
-  }
-  if (!data.city || data.city.trim().length < 2) {
-    errors.push({ field: 'city', message: 'Cidade é obrigatória' });
-  }
-  if (!data.objective || data.objective.trim().length < 3) {
-    errors.push({ field: 'objective', message: 'Objetivo é obrigatório' });
-  }
-  if (!['natural', 'marcante', 'discreto'].includes(data.style)) {
-    errors.push({ field: 'style', message: 'Estilo inválido' });
-  }
-  if (!['tecnico', 'simples'].includes(data.commPreference)) {
-    errors.push({ field: 'commPreference', message: 'Preferência de comunicação inválida' });
-  }
+  // Registra o Service Worker na inicialização do app
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
-  return errors;
+  // Escuta evento de sessão expirada
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setProfile(null);
+      setCurrentAdmin(null);
+      setStep(AppStep.LOGIN);
+      showToast('Sua sessão expirou. Faça login novamente.');
+    };
+    window.addEventListener('jvip:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('jvip:auth-expired', handleAuthExpired);
+  }, []);
+
+  // Rastreia mudança de tela
+  useEffect(() => {
+    if (profile) trackScreen(profile.id, AppStep[step].toLowerCase());
+  }, [step, profile]);
+
+  // Inicia sessão quando paciente chega ao dashboard
+  useEffect(() => {
+    if (profile && step === AppStep.DASHBOARD) {
+      trackSessionStart(profile.id);
+    }
+  }, [profile?.id, step]);
+
+  // Smartlook identify
+  useEffect(() => {
+    if (profile && window.smartlook) {
+      window.smartlook('identify', profile.id, {
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        objective: profile.objective,
+      });
+    }
+  }, [profile]);
+
+  // ── Toast notification ──────────────────────────────────────────────────
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  }, []);
+
+  // ── Navegação ───────────────────────────────────────────────────────────
+
+  const handleNextStep = useCallback((next: AppStep) => {
+    setStep(next);
+  }, []);
+
+  // ── Salvar registro do paciente ─────────────────────────────────────────
+
+  const savePatientRecord = useCallback(async (finalAnamnesis: AnamnesisData) => {
+    if (!profile) return;
+    setIsLoading(true);
+
+    try {
+      const success = await api.saveAnamnesis(profile.id, finalAnamnesis);
+      if (success) {
+        setAnamnesis(finalAnamnesis);
+        handleNextStep(AppStep.DASHBOARD);
+
+        if (window.smartlook) {
+          window.smartlook('track', 'anamnesis_completed', {
+            objective: profile.objective,
+            expectations: finalAnamnesis.expectedResult,
+          });
+        }
+      } else {
+        showToast('Erro ao salvar anamnese. Tente novamente.');
+      }
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao salvar anamnese:', err);
+      showToast('Erro ao salvar anamnese. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profile, handleNextStep, showToast]);
+
+  // ── Mood Check-in ───────────────────────────────────────────────────────
+
+  const handleMoodCheckin = useCallback(async (mood: string) => {
+    if (!profile) return;
+
+    try {
+      await api.updatePatient(profile.id, { moodCheckin: mood });
+      setProfile(prev => prev ? { ...prev, moodCheckin: mood } : null);
+
+      if (window.smartlook) {
+        window.smartlook('track', 'mood_checkin', { mood });
+      }
+      showToast('Obrigado por compartilhar como se sente!');
+    } catch (err) {
+      console.error('[JornadaVip] Erro no mood checkin:', err);
+    }
+  }, [profile, showToast]);
+
+  // ── Criar perfil de paciente ────────────────────────────────────────────
+
+  const handleProfileComplete = useCallback(async (data: Omit<PatientProfile, 'id' | 'createdAt'>) => {
+    setIsLoading(true);
+    try {
+      const record = await api.createPatient(data);
+      setProfile(record.profile);
+      handleNextStep(AppStep.DASHBOARD);
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao criar perfil:', err);
+      showToast('Erro ao criar perfil. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [handleNextStep, showToast]);
+
+  // ── Render ──────────────────────────────────────────────────────────────
+
+  const renderStep = () => {
+    switch (step) {
+      case AppStep.LOGIN:
+        return (
+          <LoginView
+            onLogin={() => handleNextStep(AppStep.PROFILE_SETUP)}
+            onAdminLogin={() => handleNextStep(AppStep.ADMIN_LOGIN)}
+          />
+        );
+      case AppStep.ADMIN_LOGIN:
+        return (
+          <AdminLoginView
+            onSuccess={(user) => { setCurrentAdmin(user); handleNextStep(AppStep.ADMIN); }}
+            onBack={() => setStep(AppStep.LOGIN)}
+          />
+        );
+      case AppStep.TERMS:
+        return <TermsView onAccept={() => handleNextStep(AppStep.PROFILE_SETUP)} />;
+      case AppStep.PROFILE_SETUP:
+        return (
+          <ProfileSetupView onComplete={handleProfileComplete} />
+        );
+      case AppStep.ANAMNESIS:
+        return <AnamnesisView onComplete={savePatientRecord} />;
+      case AppStep.DASHBOARD:
+        return (
+          <DashboardView
+            profile={profile!}
+            rewards={rewards}
+            onOpenChat={() => setShowChat(true)}
+            onNavigate={(s) => setStep(s)}
+            onMoodCheckin={handleMoodCheckin}
+          />
+        );
+      case AppStep.REWARDS:
+        return (
+          <RewardsView
+            rewards={rewards}
+            patientId={profile?.id || ''}
+            patientName={profile?.name || ''}
+            onBack={() => setStep(AppStep.DASHBOARD)}
+          />
+        );
+      case AppStep.PRE_PROCEDURE:
+        return <PreProcedureView onBack={() => setStep(AppStep.DASHBOARD)} />;
+      case AppStep.POST_PROCEDURE:
+        return <PostProcedureView onBack={() => setStep(AppStep.DASHBOARD)} />;
+      case AppStep.EVOLUTION:
+        return <EvolutionView onBack={() => setStep(AppStep.DASHBOARD)} />;
+      case AppStep.ADMIN:
+        return (
+          <AdminView
+            currentAdmin={currentAdmin!}
+            onBack={() => { clearAdminSession(); setCurrentAdmin(null); setStep(AppStep.LOGIN); }}
+          />
+        );
+      default:
+        return (
+          <DashboardView
+            profile={profile!}
+            rewards={rewards}
+            onOpenChat={() => setShowChat(true)}
+            onNavigate={(s) => setStep(s)}
+            onMoodCheckin={handleMoodCheckin}
+          />
+        );
+    }
+  };
+
+  const showFloatingChat = [AppStep.DASHBOARD, AppStep.PRE_PROCEDURE, AppStep.POST_PROCEDURE, AppStep.EVOLUTION].includes(step);
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-premium-noir text-white selection:bg-[#AABAA4]/30">
+        <div className="max-w-md mx-auto min-h-screen flex flex-col relative px-6 py-8">
+
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="w-10 h-10 border-2 border-[#AABAA4] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {renderStep()}
+
+          {showFloatingChat && (
+            <button
+              onClick={() => setShowChat(true)}
+              className="fixed bottom-6 right-6 w-14 h-14 bg-sage rounded-full shadow-lg flex items-center justify-center animate-bounce hover:scale-110 transition-transform z-40"
+              aria-label="Abrir chat"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-[#1A1A1B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+            </button>
+          )}
+
+          {showChat && <GeminiChat onClose={() => setShowChat(false)} />}
+
+          {/* Toast notification */}
+          {toastMessage && (
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#AABAA4] text-[#1A1A1B] px-6 py-3 rounded-xl shadow-lg text-sm font-medium z-50 animate-fade-in max-w-[85vw] text-center">
+              {toastMessage}
+            </div>
+          )}
+
+          <div className="mt-auto pt-10 pb-4 flex justify-center opacity-40">
+            <div className="text-[10px] tracking-[0.3em] font-serif uppercase sage-green">VIP ESTETIC</div>
+          </div>
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
 };
 
-// ── Validação de anamnese ───────────────────────────────────────────────────
-
-export const validateAnamnesis = (data: Record<string, any>): ValidationError[] => {
-  const errors: ValidationError[] = [];
-
-  if (!data.healthGeneral || data.healthGeneral.trim().length < 2) {
-    errors.push({ field: 'healthGeneral', message: 'Informar condições de saúde' });
-  }
-  if (data.expectedResult && data.expectedResult.length > 2000) {
-    errors.push({ field: 'expectedResult', message: 'Resultado esperado muito longo (máx 2000 caracteres)' });
-  }
-  if (typeof data.pregnancy !== 'boolean') {
-    errors.push({ field: 'pregnancy', message: 'Informar se está gestante' });
-  }
-  if (!data.habits || typeof data.habits !== 'object') {
-    errors.push({ field: 'habits', message: 'Informar hábitos' });
-  }
-
-  return errors;
-};
-
-// ── Validação de credenciais admin ──────────────────────────────────────────
-
-export const validateAdminCredentials = (username: string, password: string): ValidationError[] => {
-  const errors: ValidationError[] = [];
-
-  if (!username || username.length < 3) {
-    errors.push({ field: 'username', message: 'Usuário deve ter pelo menos 3 caracteres' });
-  }
-  if (!password || password.length < 8) {
-    errors.push({ field: 'password', message: 'Senha deve ter pelo menos 8 caracteres' });
-  }
-  if (password && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-    errors.push({ field: 'password', message: 'Senha deve conter letras maiúsculas, minúsculas e números' });
-  }
-
-  return errors;
-};
+export default App;
