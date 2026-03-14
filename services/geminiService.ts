@@ -1,8 +1,18 @@
 
+// ─────────────────────────────────────────────────────────────────────────────
+// geminiService.ts — Acesso direto ao Gemini (apenas modo dev sem backend)
+//
+// Em produção, NUNCA use este service diretamente.
+// Use apiService.aiChat() e apiService.aiSummary() que fazem proxy pelo CRM.
+// Este arquivo só é importado dinamicamente pelo apiService quando USE_LOCAL_STORAGE=true.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { GoogleGenAI } from "@google/genai";
 import { PatientProfile, AnamnesisData } from "../types";
+import { CONFIG } from "./config";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "";
+const ai = new GoogleGenAI({ apiKey });
 
 export const getGeminiSummaryForClinic = async (profile: PatientProfile, anamnesis: AnamnesisData) => {
   const model = "gemini-2.0-flash";
@@ -50,7 +60,7 @@ export const chatWithGemini = async (message: string, history: { role: string, p
     const chat = ai.chats.create({
       model,
       config: {
-        systemInstruction: "Você é o assistente virtual da Clínica VIP Estética. Seja extremamente educado, refinado e utilize termos que transmitam segurança e exclusividade. Ajude o paciente com dúvidas sobre pré e pós operatório baseado em protocolos de estética de luxo.",
+        systemInstruction: `Você é o assistente virtual da ${CONFIG.CLINIC_NAME}. Seja extremamente educado, refinado e utilize termos que transmitam segurança e exclusividade. Ajude o paciente com dúvidas sobre pré e pós-procedimento baseado em protocolos de estética avançada. Nunca faça diagnósticos ou receite medicamentos.`,
       }
     });
     const response = await chat.sendMessage({ message });
