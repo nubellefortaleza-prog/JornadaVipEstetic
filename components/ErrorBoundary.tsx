@@ -91,16 +91,16 @@ class ErrorBoundary extends Component<Props, State> {
 
             {this.state.error && (
               <details className="text-left bg-white/5 rounded-lg p-3">
-                <summary className="text-white/40 text-xs cursor-pointer">
+                <summary className="text-white/60 text-xs cursor-pointer">
                   Detalhes tecnicos
                 </summary>
-                <pre className="text-white/30 text-[10px] mt-2 overflow-auto max-h-32 whitespace-pre-wrap">
+                <pre className="text-white/50 text-[11px] mt-2 overflow-auto max-h-32 whitespace-pre-wrap">
                   {this.state.error.message}
                 </pre>
               </details>
             )}
 
-            <p className="text-white/30 text-[10px] tracking-[0.3em] uppercase">
+            <p className="text-white/50 text-[11px] tracking-[0.3em] uppercase">
               VIP ESTETIC
             </p>
           </div>

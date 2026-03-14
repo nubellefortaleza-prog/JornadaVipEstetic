@@ -33,7 +33,7 @@ const PreProcedureView: React.FC<Props> = ({ onBack }) => {
     <div className="flex flex-col flex-1 pb-10">
       <div className="flex items-center space-x-4 mb-8">
         <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-full">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -41,22 +41,22 @@ const PreProcedureView: React.FC<Props> = ({ onBack }) => {
       </div>
 
       {/* Conteúdo Educativo */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-6">
+      <div className="bg-white/5 border border-white/15 rounded-3xl p-6 mb-6">
         <h3 className="text-sm font-semibold mb-2">O que esperar?</h3>
         <p className="text-xs text-white/60 leading-relaxed mb-4">
           O preenchimento é um procedimento minimamente invasivo. Você pode sentir uma leve pressão, mas usamos anestésico para seu total conforto.
         </p>
-        <div className="p-3 bg-sage/5 rounded-xl border border-sage/10 text-[10px] sage-green italic">
+        <div className="p-3 bg-sage/5 rounded-xl border border-sage/10 text-[11px] sage-green italic">
           "A beleza natural é o resultado de um preparo cuidadoso."
         </div>
       </div>
 
       {/* Checklist */}
       <div className="space-y-4 mb-6">
-        <h4 className="text-xs uppercase tracking-widest text-white/40 px-1">Checklist de Preparo</h4>
+        <h4 className="text-xs uppercase tracking-widest text-white/60 px-1">Checklist de Preparo</h4>
         {steps.map((step, i) => (
-          <div key={i} className={`flex items-start space-x-4 p-4 rounded-2xl border transition-all ${step.done ? 'bg-sage/5 border-sage/30' : 'bg-white/5 border-white/10'}`}>
-            <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${step.done ? 'bg-sage border-sage' : 'border-white/20'}`}>
+          <div key={i} className={`flex items-start space-x-4 p-4 rounded-2xl border transition-all ${step.done ? 'bg-sage/5 border-sage/30' : 'bg-white/5 border-white/15'}`}>
+            <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${step.done ? 'bg-sage border-sage' : 'border-white/30'}`}>
               {step.done && (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#1A1A1B]" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -64,7 +64,7 @@ const PreProcedureView: React.FC<Props> = ({ onBack }) => {
               )}
             </div>
             <div>
-              <p className={`text-xs font-bold ${step.done ? 'sage-green' : 'text-white/40'}`}>{step.title}</p>
+              <p className={`text-xs font-bold ${step.done ? 'sage-green' : 'text-white/60'}`}>{step.title}</p>
               <p className="text-[11px] text-white/60">{step.desc}</p>
             </div>
           </div>
@@ -75,7 +75,7 @@ const PreProcedureView: React.FC<Props> = ({ onBack }) => {
       <div className="mb-6">
         <button
           onClick={() => setShowMythsFacts(!showMythsFacts)}
-          className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] uppercase tracking-[0.2em] font-bold hover:bg-white/10 transition-all"
+          className="w-full py-3 bg-white/5 border border-white/15 rounded-xl text-[11px] uppercase tracking-[0.2em] font-bold hover:bg-white/10 transition-all"
         >
           {showMythsFacts ? 'Fechar' : 'Mitos e Verdades sobre o Procedimento'}
         </button>
@@ -83,7 +83,7 @@ const PreProcedureView: React.FC<Props> = ({ onBack }) => {
           <div className="mt-4 space-y-3">
             {mythsFacts.map((item, i) => (
               <div key={i} className={`p-4 rounded-2xl border ${item.myth ? 'bg-red-500/5 border-red-500/20' : 'bg-sage/5 border-sage/20'}`}>
-                <span className={`text-[9px] font-bold uppercase tracking-wider ${item.myth ? 'text-red-400' : 'text-sage'}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-wider ${item.myth ? 'text-red-400' : 'text-sage'}`}>
                   {item.myth ? '✗ Mito' : '✓ Verdade'}
                 </span>
                 <p className="text-xs text-white/70 mt-1">{item.text}</p>

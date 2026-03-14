@@ -60,34 +60,34 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
     <div className="flex flex-col flex-1 pb-10">
       <div className="flex items-center space-x-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-full">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
           <h2 className="text-xl font-serif">Diário de Evolução</h2>
-          <p className="text-xs text-white/40">Acompanhe sua transformação</p>
+          <p className="text-xs text-white/60">Acompanhe sua transformação</p>
         </div>
       </div>
 
       {/* Formulário de Nova Entrada */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-5 mb-6">
-        <h4 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-4">Registrar Hoje</h4>
+      <div className="bg-white/5 border border-white/15 rounded-3xl p-5 mb-6">
+        <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Registrar Hoje</h4>
 
         {/* Upload de Foto */}
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="w-full h-32 bg-white/5 border border-dashed border-white/20 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all mb-4 overflow-hidden"
+          className="w-full h-32 bg-white/5 border border-dashed border-white/30 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all mb-4 overflow-hidden"
         >
           {previewUrl ? (
             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-2xl" />
           ) : (
             <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white/20 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white/50 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <span className="text-xs text-white/30">Toque para adicionar foto</span>
+              <span className="text-xs text-white/50">Toque para adicionar foto</span>
             </>
           )}
         </div>
@@ -103,7 +103,7 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-sage/50 transition-colors min-h-[80px] mb-4"
+          className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-sm outline-none focus:border-sage/50 transition-colors min-h-[80px] mb-4"
           placeholder="Como está sua pele hoje? Conte sobre sua evolução..."
         />
 
@@ -118,25 +118,25 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
 
       {/* Histórico */}
       <div className="space-y-4">
-        <h4 className="text-xs uppercase tracking-widest text-white/40 px-1">Histórico de Evolução</h4>
+        <h4 className="text-xs uppercase tracking-widest text-white/60 px-1">Histórico de Evolução</h4>
 
         {entries.length === 0 ? (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-            <p className="text-sm text-white/30">Nenhum registro ainda.</p>
-            <p className="text-xs text-white/20 mt-1">Comece documentando sua jornada!</p>
+          <div className="bg-white/5 border border-white/15 rounded-2xl p-8 text-center">
+            <p className="text-sm text-white/50">Nenhum registro ainda.</p>
+            <p className="text-xs text-white/50 mt-1">Comece documentando sua jornada!</p>
           </div>
         ) : (
           entries.map((entry) => (
-            <div key={entry.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+            <div key={entry.id} className="bg-white/5 border border-white/15 rounded-2xl overflow-hidden">
               {entry.photoUrl && (
                 <img src={entry.photoUrl} alt="Evolução" className="w-full h-48 object-cover" />
               )}
               <div className="p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] text-white/30 uppercase tracking-wider">{formatDate(entry.date)}</span>
+                  <span className="text-[11px] text-white/50 uppercase tracking-wider">{formatDate(entry.date)}</span>
                   <button
                     onClick={() => handleDelete(entry.id)}
-                    className="text-[10px] text-red-400/50 hover:text-red-400 transition-colors"
+                    className="text-[11px] text-red-400/50 hover:text-red-400 transition-colors"
                   >
                     Remover
                   </button>

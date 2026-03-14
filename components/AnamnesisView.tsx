@@ -34,7 +34,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-serif text-white/90 mb-1">Anamnese</h2>
-        <p className="text-xs text-white/40">{blocks[currentBlock].subtitle}</p>
+        <p className="text-xs text-white/60">{blocks[currentBlock].subtitle}</p>
       </div>
 
       {/* Barra de Progresso */}
@@ -43,8 +43,8 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
           {blocks.map((block, i) => (
             <span
               key={i}
-              className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                i <= currentBlock ? 'sage-green' : 'text-white/20'
+              className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                i <= currentBlock ? 'sage-green' : 'text-white/50'
               }`}
             >
               {block.title}
@@ -58,7 +58,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
           />
         </div>
         <div className="flex justify-end mt-1">
-          <span className="text-[10px] text-white/30">{currentBlock + 1} de {blocks.length}</span>
+          <span className="text-[11px] text-white/50">{currentBlock + 1} de {blocks.length}</span>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Possui doenças crônicas ou condições de saúde?</label>
               <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 min-h-[100px] outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 min-h-[100px] outline-none focus:border-sage/50 transition-colors"
                 placeholder="Ex: Diabetes, Hipertensão..."
                 onChange={(e) => setData({...data, healthGeneral: e.target.value})}
               />
@@ -76,7 +76,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Possui alergias alimentares ou medicamentosas?</label>
               <input
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
                 placeholder="Ex: Iodo, Dipirona, Latex..."
                 onChange={(e) => setData({...data, allergies: e.target.value})}
               />
@@ -84,12 +84,12 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Faz uso de algum medicamento contínuo?</label>
               <input
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
                 placeholder="Ex: Anticoagulante, Isotretinoína..."
                 onChange={(e) => setData({...data, medications: e.target.value})}
               />
             </div>
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/15">
               <span className="text-sm">Gestante ou pode estar grávida?</span>
               <button
                 onClick={() => setData({...data, pregnancy: !data.pregnancy})}
@@ -106,7 +106,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Exposição solar diária</label>
               <select
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
                 onChange={(e) => setData({...data, habits: {...data.habits!, sun: e.target.value}})}
               >
                 <option value="baixa">Baixa (Ambiente interno)</option>
@@ -117,7 +117,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Horas de sono por noite</label>
               <select
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
                 onChange={(e) => setData({...data, habits: {...data.habits!, sleep: e.target.value}})}
               >
                 <option value="menos de 6h">Menos de 6h</option>
@@ -129,7 +129,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Rotina de skincare</label>
               <select
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-sage/50 transition-colors"
                 onChange={(e) => setData({...data, habits: {...data.habits!, skincare: e.target.value}})}
               >
                 <option value="nenhum">Nenhuma rotina</option>
@@ -137,7 +137,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
                 <option value="completo">Completa (com ativos e FPS)</option>
               </select>
             </div>
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/15">
               <span className="text-sm">Tabagismo</span>
               <button
                 onClick={() => setData({...data, habits: {...data.habits!, smoking: !data.habits?.smoking}})}
@@ -154,7 +154,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Procedimentos que já realizou</label>
               <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 min-h-[80px] outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 min-h-[80px] outline-none focus:border-sage/50 transition-colors"
                 placeholder="Ex: Botox há 6 meses, preenchimento labial..."
                 onChange={(e) => setData({...data, pastProcedures: e.target.value})}
               />
@@ -162,7 +162,7 @@ const AnamnesisView: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="text-xs text-white/60 block mb-2">Qual o resultado esperado ao final do tratamento?</label>
               <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 min-h-[100px] outline-none focus:border-sage/50 transition-colors"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 min-h-[100px] outline-none focus:border-sage/50 transition-colors"
                 placeholder="Descreva seu sonho..."
                 onChange={(e) => setData({...data, expectedResult: e.target.value})}
               />

@@ -102,12 +102,12 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
           </div>
           <div className="flex-1">
             <p className="text-xs font-bold text-white/90 mb-0.5">Receba avisos da clínica</p>
-            <p className="text-[10px] text-white/50 mb-3">Ative as notificações para receber lembretes de consulta e orientações pós-procedimento.</p>
+            <p className="text-[11px] text-white/50 mb-3">Ative as notificações para receber lembretes de consulta e orientações pós-procedimento.</p>
             <div className="flex space-x-2">
-              <button onClick={handleEnableNotifications} className="px-4 py-1.5 bg-sage text-[#1A1A1B] text-[10px] font-bold rounded-lg">
+              <button onClick={handleEnableNotifications} className="px-4 py-1.5 bg-sage text-[#1A1A1B] text-[11px] font-bold rounded-lg">
                 Ativar
               </button>
-              <button onClick={() => setShowNotifBanner(false)} className="px-4 py-1.5 bg-white/5 text-white/40 text-[10px] rounded-lg">
+              <button onClick={() => setShowNotifBanner(false)} className="px-4 py-1.5 bg-white/5 text-white/60 text-[11px] rounded-lg">
                 Agora não
               </button>
             </div>
@@ -154,7 +154,7 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
                   {activeCampaign.ctaLabel}
                 </a>
               )}
-              <button onClick={closeCampaign} className="w-full py-3 bg-white/5 border border-white/10 text-white/60 text-sm rounded-2xl">
+              <button onClick={closeCampaign} className="w-full py-3 bg-white/5 border border-white/15 text-white/60 text-sm rounded-2xl">
                 {campaignQueue.length > 1 ? `Fechar (${campaignQueue.length - 1} restante${campaignQueue.length > 2 ? 's' : ''})` : 'Fechar'}
               </button>
             </div>
@@ -196,8 +196,8 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
       </div>
 
       {/* ── Check-in de Humor ────────────────────────────────────────────────── */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-5">
-        <h3 className="text-[10px] uppercase tracking-widest text-white/40 mb-3 text-center">Como você está se sentindo hoje?</h3>
+      <div className="bg-white/5 border border-white/15 rounded-3xl p-5">
+        <h3 className="text-[11px] uppercase tracking-widest text-white/60 mb-3 text-center">Como você está se sentindo hoje?</h3>
         <div className="flex justify-around">
           {['😔', '😐', '😊', '✨'].map((emoji, idx) => (
             <button
@@ -216,9 +216,9 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
 
       {/* ── Bloco de Próximo Atendimento ─────────────────────────────────────── */}
       <div className="bg-white/5 border-l-4 border-sage rounded-xl p-5">
-        <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Seu próximo atendimento</span>
+        <span className="text-[11px] uppercase tracking-widest text-white/60 font-bold">Seu próximo atendimento</span>
         <h3 className="text-lg font-serif sage-green mt-1">Sexta-feira, 25 de Outubro</h3>
-        <p className="text-[10px] text-white/60 mt-0.5">Horário: 14:30h • Dra. Sofia</p>
+        <p className="text-[11px] text-white/60 mt-0.5">Horário: 14:30h • Dra. Sofia</p>
       </div>
 
       {/* ── Grid Features ────────────────────────────────────────────────────── */}
@@ -248,14 +248,14 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
           <button
             key={item.label}
             onClick={() => { onNavigate(item.step); trackFeature(profile.id, item.feature); }}
-            className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors"
+            className="bg-white/5 border border-white/15 rounded-2xl p-5 text-left flex flex-col justify-between h-32 hover:bg-white/10 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sage-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {item.icon}
             </svg>
             <div>
               <span className="text-sm font-semibold block">{item.label}</span>
-              <span className="text-[10px] text-white/40">{item.sub}</span>
+              <span className="text-[11px] text-white/60">{item.sub}</span>
             </div>
           </button>
         ))}
@@ -278,7 +278,7 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => trackFeature(profile.id, 'instagram_click')}
-        className="w-full py-4 bg-black border border-white/10 rounded-2xl flex items-center justify-center space-x-3 hover:bg-white/5 transition-all"
+        className="w-full py-4 bg-black border border-white/15 rounded-2xl flex items-center justify-center space-x-3 hover:bg-white/5 transition-all"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
