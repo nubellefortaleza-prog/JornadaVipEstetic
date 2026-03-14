@@ -35,13 +35,13 @@ const PostProcedureView: React.FC<Props> = ({ onBack }) => {
     <div className="flex flex-col flex-1 pb-10">
       <div className="flex items-center space-x-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-full">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
           <h2 className="text-xl font-serif">Cuidados Pós-Procedimento</h2>
-          <p className="text-xs text-white/40">Protocolo VIP de recuperação</p>
+          <p className="text-xs text-white/60">Protocolo VIP de recuperação</p>
         </div>
       </div>
 
@@ -61,13 +61,13 @@ const PostProcedureView: React.FC<Props> = ({ onBack }) => {
 
       {/* Lista de Cuidados */}
       <div className="space-y-3 mb-6">
-        <h4 className="text-xs uppercase tracking-widest text-white/40 px-1">Protocolo de Recuperação</h4>
+        <h4 className="text-xs uppercase tracking-widest text-white/60 px-1">Protocolo de Recuperação</h4>
         {careItems.map((item, i) => (
           <button
             key={i}
             onClick={() => toggleItem(i)}
             className={`w-full flex items-center space-x-4 p-4 rounded-2xl border text-left transition-all ${
-              checkedItems[i] ? 'bg-sage/5 border-sage/30' : 'bg-white/5 border-white/10 hover:bg-white/8'
+              checkedItems[i] ? 'bg-sage/5 border-sage/30' : 'bg-white/5 border-white/15 hover:bg-white/8'
             }`}
           >
             <span className="text-xl flex-shrink-0">{item.icon}</span>
@@ -75,7 +75,7 @@ const PostProcedureView: React.FC<Props> = ({ onBack }) => {
               <p className={`text-xs font-bold ${checkedItems[i] ? 'sage-green' : 'text-white/60'}`}>{item.period}</p>
               <p className={`text-[11px] ${checkedItems[i] ? 'text-white/50 line-through' : 'text-white/70'}`}>{item.desc}</p>
             </div>
-            <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${checkedItems[i] ? 'bg-sage border-sage' : 'border-white/20'}`}>
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${checkedItems[i] ? 'bg-sage border-sage' : 'border-white/30'}`}>
               {checkedItems[i] && (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-[#1A1A1B]" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -88,7 +88,7 @@ const PostProcedureView: React.FC<Props> = ({ onBack }) => {
 
       {/* Alerta Importante */}
       <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 mb-6">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-1">⚠️ Sinais de Alerta</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-red-400 mb-1">⚠️ Sinais de Alerta</p>
         <p className="text-xs text-white/60 leading-relaxed">
           Em caso de dor intensa, inchaço excessivo, febre ou vermelhidão persistente após 48h, entre em contato imediatamente com a clínica.
         </p>

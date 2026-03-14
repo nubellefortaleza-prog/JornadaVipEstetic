@@ -11,7 +11,7 @@ const TermsView: React.FC<Props> = ({ onAccept }) => {
       <h2 className="text-2xl font-serif mb-8 text-white/90">Privacidade e Consentimento</h2>
       
       <div className="space-y-6 overflow-y-auto max-h-[60vh] pr-2 custom-scroll">
-        <section className="bg-white/5 p-4 rounded-xl border border-white/10">
+        <section className="bg-white/5 p-4 rounded-xl border border-white/15">
           <div className="flex items-start space-x-4">
             <input type="checkbox" defaultChecked className="mt-1 accent-sage" />
             <div>
@@ -35,7 +35,7 @@ const TermsView: React.FC<Props> = ({ onAccept }) => {
           </div>
         </section>
 
-        <section className="bg-white/5 p-4 rounded-xl border border-white/10">
+        <section className="bg-white/5 p-4 rounded-xl border border-white/15">
           <div className="flex items-start space-x-4">
             <input type="checkbox" defaultChecked className="mt-1 accent-sage" />
             <div>

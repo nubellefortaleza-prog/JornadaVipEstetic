@@ -50,7 +50,7 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#1A1A1B]">
-      <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#1A1A1B]">
+      <div className="flex items-center justify-between p-6 border-b border-white/15 bg-[#1A1A1B]">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-sage rounded-full flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#1A1A1B]" viewBox="0 0 24 24" fill="currentColor">
@@ -59,11 +59,11 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
           </div>
           <div>
             <h2 className="text-sm font-semibold">Assistente VIP</h2>
-            <p className="text-[10px] text-sage animate-pulse">Online para você</p>
+            <p className="text-[11px] text-sage animate-pulse">Online para você</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -75,7 +75,7 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
             <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
               m.role === 'user' 
                 ? 'bg-sage text-[#1A1A1B] font-medium' 
-                : 'bg-white/5 border border-white/10 text-white/80'
+                : 'bg-white/5 border border-white/15 text-white/80'
             }`}>
               {m.text}
             </div>
@@ -83,7 +83,7 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl text-white/40 text-xs flex items-center space-x-2">
+            <div className="bg-white/5 border border-white/15 px-4 py-3 rounded-2xl text-white/60 text-xs flex items-center space-x-2">
               <div className="flex space-x-1">
                 <div className="w-1.5 h-1.5 bg-sage rounded-full animate-bounce" />
                 <div className="w-1.5 h-1.5 bg-sage rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -96,8 +96,8 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
         <div ref={scrollRef} />
       </div>
 
-      <div className="p-6 border-t border-white/10 bg-[#1A1A1B]">
-        <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1 px-4 focus-within:border-sage transition-colors">
+      <div className="p-6 border-t border-white/15 bg-[#1A1A1B]">
+        <div className="flex items-center bg-white/5 border border-white/15 rounded-2xl p-1 px-4 focus-within:border-sage transition-colors">
           <input 
             value={input}
             onChange={(e) => setInput(e.target.value)}

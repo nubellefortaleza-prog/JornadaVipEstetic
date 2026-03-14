@@ -35,7 +35,7 @@ const AdminLoginView: React.FC<Props> = ({ onSuccess, onBack }) => {
     <div className="flex flex-col items-center justify-center flex-1 space-y-10">
       <div className="text-center">
         <div className="text-3xl tracking-[0.4em] font-serif uppercase sage-green mb-2">VIP ESTETIC</div>
-        <p className="text-xs text-white/40 uppercase tracking-widest">Acesso Clínico</p>
+        <p className="text-xs text-white/60 uppercase tracking-widest">Acesso Clínico</p>
       </div>
 
       <form onSubmit={handleSubmit} className="w-full space-y-3">
@@ -46,7 +46,7 @@ const AdminLoginView: React.FC<Props> = ({ onSuccess, onBack }) => {
             placeholder="Usuário"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm outline-none focus:border-sage transition-colors"
+            className="w-full bg-white/5 border border-white/15 rounded-2xl px-5 py-4 text-sm outline-none focus:border-sage transition-colors"
           />
         </div>
         <div>
@@ -56,7 +56,7 @@ const AdminLoginView: React.FC<Props> = ({ onSuccess, onBack }) => {
             placeholder="Senha"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm outline-none focus:border-sage transition-colors"
+            className="w-full bg-white/5 border border-white/15 rounded-2xl px-5 py-4 text-sm outline-none focus:border-sage transition-colors"
           />
         </div>
 
@@ -73,7 +73,7 @@ const AdminLoginView: React.FC<Props> = ({ onSuccess, onBack }) => {
         </button>
       </form>
 
-      <button onClick={onBack} className="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest">
+      <button onClick={onBack} className="text-[11px] text-white/50 hover:text-white/60 transition-colors uppercase tracking-widest">
         Voltar
       </button>
     </div>

@@ -266,8 +266,8 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <div className="mt-auto pt-10 pb-4 flex justify-center opacity-40">
-            <div className="text-[10px] tracking-[0.3em] font-serif uppercase sage-green">VIP ESTETIC</div>
+          <div className="mt-auto pt-10 pb-4 flex justify-center opacity-60">
+            <div className="text-[11px] tracking-[0.3em] font-serif uppercase sage-green">VIP ESTETIC</div>
           </div>
         </div>
       </div>
