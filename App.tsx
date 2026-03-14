@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord, AdminUser } from './types';
 import LoginView from './components/LoginView';
 import TermsView from './components/TermsView';
@@ -13,9 +13,11 @@ import RewardsView from './components/RewardsView';
 import PreProcedureView from './components/PreProcedureView';
 import PostProcedureView from './components/PostProcedureView';
 import EvolutionView from './components/EvolutionView';
+import ErrorBoundary from './components/ErrorBoundary';
 import { registerServiceWorker } from './services/notificationService';
 import { trackScreen, trackSessionStart } from './services/analyticsService';
 import { clearAdminSession } from './services/adminAuthService';
+import * as api from './services/apiService';
 
 // Tipagem para o Smartlook no window
 declare global {
@@ -36,10 +38,24 @@ const App: React.FC = () => {
     level: 'Iniciante'
   });
   const [showChat, setShowChat] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Registra o Service Worker na inicialização do app
   useEffect(() => {
     registerServiceWorker();
+  }, []);
+
+  // Escuta evento de sessão expirada
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setProfile(null);
+      setCurrentAdmin(null);
+      setStep(AppStep.LOGIN);
+      showToast('Sua sessão expirou. Faça login novamente.');
+    };
+    window.addEventListener('jvip:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('jvip:auth-expired', handleAuthExpired);
   }, []);
 
   // Rastreia mudança de tela
@@ -47,13 +63,14 @@ const App: React.FC = () => {
     if (profile) trackScreen(profile.id, AppStep[step].toLowerCase());
   }, [step, profile]);
 
-  // Inicia sessão (geolocalização + referrer) quando paciente chega ao dashboard
+  // Inicia sessão quando paciente chega ao dashboard
   useEffect(() => {
     if (profile && step === AppStep.DASHBOARD) {
       trackSessionStart(profile.id);
     }
-  }, [profile?.id, step === AppStep.DASHBOARD]);
+  }, [profile?.id, step]);
 
+  // Smartlook identify
   useEffect(() => {
     if (profile && window.smartlook) {
       window.smartlook('identify', profile.id, {
@@ -65,50 +82,83 @@ const App: React.FC = () => {
     }
   }, [profile]);
 
-  const handleNextStep = (next: AppStep) => {
+  // ── Toast notification ──────────────────────────────────────────────────
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  }, []);
+
+  // ── Navegação ───────────────────────────────────────────────────────────
+
+  const handleNextStep = useCallback((next: AppStep) => {
     setStep(next);
-  };
+  }, []);
 
-  const savePatientRecord = (finalAnamnesis: AnamnesisData) => {
-    if (profile) {
-      const existing: PatientRecord[] = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-      const idx = existing.findIndex(r => r.profile.id === profile.id);
-      if (idx >= 0) {
-        existing[idx] = { ...existing[idx], anamnesis: finalAnamnesis };
+  // ── Salvar registro do paciente ─────────────────────────────────────────
+
+  const savePatientRecord = useCallback(async (finalAnamnesis: AnamnesisData) => {
+    if (!profile) return;
+    setIsLoading(true);
+
+    try {
+      const success = await api.saveAnamnesis(profile.id, finalAnamnesis);
+      if (success) {
+        setAnamnesis(finalAnamnesis);
+        handleNextStep(AppStep.DASHBOARD);
+
+        if (window.smartlook) {
+          window.smartlook('track', 'anamnesis_completed', {
+            objective: profile.objective,
+            expectations: finalAnamnesis.expectedResult,
+          });
+        }
       } else {
-        existing.push({ profile, anamnesis: finalAnamnesis, reminders: [] });
+        showToast('Erro ao salvar anamnese. Tente novamente.');
       }
-      localStorage.setItem('clinic_records', JSON.stringify(existing));
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao salvar anamnese:', err);
+      showToast('Erro ao salvar anamnese. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profile, handleNextStep, showToast]);
 
-      setAnamnesis(finalAnamnesis);
-      handleNextStep(AppStep.DASHBOARD);
+  // ── Mood Check-in ───────────────────────────────────────────────────────
+
+  const handleMoodCheckin = useCallback(async (mood: string) => {
+    if (!profile) return;
+
+    try {
+      await api.updatePatient(profile.id, { moodCheckin: mood });
+      setProfile(prev => prev ? { ...prev, moodCheckin: mood } : null);
 
       if (window.smartlook) {
-        window.smartlook('track', 'anamnesis_completed', {
-          objective: profile.objective,
-          expectations: finalAnamnesis.expectedResult
-        });
+        window.smartlook('track', 'mood_checkin', { mood });
       }
+      showToast('Obrigado por compartilhar como se sente!');
+    } catch (err) {
+      console.error('[JornadaVip] Erro no mood checkin:', err);
     }
-  };
+  }, [profile, showToast]);
 
-  const handleMoodCheckin = (mood: string) => {
-    if (!profile) return;
-    const existing = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-    const updated = existing.map((r: PatientRecord) => {
-      if (r.profile.id === profile.id) {
-        return { ...r, profile: { ...r.profile, moodCheckin: mood } };
-      }
-      return r;
-    });
-    localStorage.setItem('clinic_records', JSON.stringify(updated));
-    setProfile({ ...profile, moodCheckin: mood });
+  // ── Criar perfil de paciente ────────────────────────────────────────────
 
-    if (window.smartlook) {
-      window.smartlook('track', 'mood_checkin', { mood });
+  const handleProfileComplete = useCallback(async (data: Omit<PatientProfile, 'id' | 'createdAt'>) => {
+    setIsLoading(true);
+    try {
+      const record = await api.createPatient(data);
+      setProfile(record.profile);
+      handleNextStep(AppStep.DASHBOARD);
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao criar perfil:', err);
+      showToast('Erro ao criar perfil. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-    alert('Obrigado por compartilhar como se sente! Isso nos ajuda a cuidar melhor de você.');
-  };
+  }, [handleNextStep, showToast]);
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   const renderStep = () => {
     switch (step) {
@@ -130,13 +180,7 @@ const App: React.FC = () => {
         return <TermsView onAccept={() => handleNextStep(AppStep.PROFILE_SETUP)} />;
       case AppStep.PROFILE_SETUP:
         return (
-          <ProfileSetupView onComplete={(data) => {
-            const newProfile = { ...data, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString() };
-            setProfile(newProfile);
-            const existing = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-            localStorage.setItem('clinic_records', JSON.stringify([...existing, { profile: newProfile, reminders: [] }]));
-            handleNextStep(AppStep.DASHBOARD);
-          }} />
+          <ProfileSetupView onComplete={handleProfileComplete} />
         );
       case AppStep.ANAMNESIS:
         return <AnamnesisView onComplete={savePatientRecord} />;
@@ -188,25 +232,46 @@ const App: React.FC = () => {
   const showFloatingChat = [AppStep.DASHBOARD, AppStep.PRE_PROCEDURE, AppStep.POST_PROCEDURE, AppStep.EVOLUTION].includes(step);
 
   return (
-    <div className="min-h-screen bg-premium-noir text-white selection:bg-[#AABAA4]/30">
-      <div className="max-w-md mx-auto min-h-screen flex flex-col relative px-6 py-8">
-        {renderStep()}
-        {showFloatingChat && (
-          <button
-            onClick={() => setShowChat(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-sage rounded-full shadow-lg flex items-center justify-center animate-bounce hover:scale-110 transition-transform z-40"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-[#1A1A1B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          </button>
-        )}
-        {showChat && <GeminiChat onClose={() => setShowChat(false)} />}
-        <div className="mt-auto pt-10 pb-4 flex justify-center opacity-40">
-          <div className="text-[10px] tracking-[0.3em] font-serif uppercase sage-green">VIP ESTETIC</div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-premium-noir text-white selection:bg-[#AABAA4]/30">
+        <div className="max-w-md mx-auto min-h-screen flex flex-col relative px-6 py-8">
+
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="w-10 h-10 border-2 border-[#AABAA4] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {renderStep()}
+
+          {showFloatingChat && (
+            <button
+              onClick={() => setShowChat(true)}
+              className="fixed bottom-6 right-6 w-14 h-14 bg-sage rounded-full shadow-lg flex items-center justify-center animate-bounce hover:scale-110 transition-transform z-40"
+              aria-label="Abrir chat"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-[#1A1A1B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+            </button>
+          )}
+
+          {showChat && <GeminiChat onClose={() => setShowChat(false)} />}
+
+          {/* Toast notification */}
+          {toastMessage && (
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#AABAA4] text-[#1A1A1B] px-6 py-3 rounded-xl shadow-lg text-sm font-medium z-50 animate-fade-in max-w-[85vw] text-center">
+              {toastMessage}
+            </div>
+          )}
+
+          <div className="mt-auto pt-10 pb-4 flex justify-center opacity-40">
+            <div className="text-[10px] tracking-[0.3em] font-serif uppercase sage-green">VIP ESTETIC</div>
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
