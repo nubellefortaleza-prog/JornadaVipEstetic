@@ -8,7 +8,8 @@ interface EvolutionEntry {
   photoUrl?: string;
 }
 
-const STORAGE_KEY = 'evolution_entries';
+// TODO: Migrar para apiService quando endpoint de evolução estiver disponível no CRM
+const STORAGE_KEY = 'jvip_evolution_entries';
 
 interface Props {
   onBack: () => void;

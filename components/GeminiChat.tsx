@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { chatWithGemini } from '../services/geminiService';
+import * as api from '../services/apiService';
+import { CONFIG } from '../services/config';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,7 +14,7 @@ interface Props {
 
 const GeminiChat: React.FC<Props> = ({ onClose }) => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', text: 'Olá! Sou seu assistente VIP. Como posso ajudar com seus cuidados hoje?' }
+    { role: 'assistant', text: `Olá! Sou seu assistente ${CONFIG.CLINIC_NAME}. Como posso ajudar com seus cuidados hoje?` }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,14 +32,20 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setLoading(true);
 
-    const history = messages.map(m => ({ 
-      role: m.role === 'user' ? 'user' : 'model', 
-      parts: m.text 
-    }));
+    try {
+      const history = messages.map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: m.text,
+      }));
 
-    const response = await chatWithGemini(userMsg, [] as any);
-    setMessages(prev => [...prev, { role: 'assistant', text: response || "Desculpe, tive um problema." }]);
-    setLoading(false);
+      const response = await api.aiChat(userMsg, history);
+      setMessages(prev => [...prev, { role: 'assistant', text: response }]);
+    } catch (err) {
+      console.error('[JornadaVip] Erro no chat IA:', err);
+      setMessages(prev => [...prev, { role: 'assistant', text: 'Desculpe, tive um problema. Tente novamente.' }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,13 +58,13 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
             </svg>
           </div>
           <div>
-            <h2 className="text-sm font-semibold">Gemini Assistant</h2>
+            <h2 className="text-sm font-semibold">Assistente VIP</h2>
             <p className="text-[10px] text-sage animate-pulse">Online para você</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l18 18" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
@@ -95,7 +102,7 @@ const GeminiChat: React.FC<Props> = ({ onClose }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Tire sua dúvida estática..."
+            placeholder="Tire sua dúvida estética..."
             className="flex-1 bg-transparent py-3 outline-none text-sm"
           />
           <button 
