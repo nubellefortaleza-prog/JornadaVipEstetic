@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { PatientProfile } from '../types';
+import { validatePatientProfile, isValidCPF, isValidPhone, isValidEmail, ValidationError } from '../services/validation';
 
 interface Props {
-  onComplete: (data: PatientProfile) => void;
+  onComplete: (data: Omit<PatientProfile, 'id' | 'createdAt'>) => void;
 }
 
 const ProfileSetupView: React.FC<Props> = ({ onComplete }) => {
@@ -12,6 +13,32 @@ const ProfileSetupView: React.FC<Props> = ({ onComplete }) => {
     style: 'natural',
     commPreference: 'simples'
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!form.name || form.name.trim().length < 2) {
+      newErrors.name = 'Nome obrigatório (mínimo 2 caracteres)';
+    }
+    if (form.cpf && !isValidCPF(form.cpf)) {
+      newErrors.cpf = 'CPF inválido';
+    }
+    if (form.phone && !isValidPhone(form.phone)) {
+      newErrors.phone = 'Telefone inválido';
+    }
+    if (form.email && !isValidEmail(form.email)) {
+      newErrors.email = 'E-mail inválido';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validate()) return;
+    onComplete(form as Omit<PatientProfile, 'id' | 'createdAt'>);
+  };
 
   const isFormValid = !!form.name && form.name.trim().length > 0;
 
@@ -22,30 +49,33 @@ const ProfileSetupView: React.FC<Props> = ({ onComplete }) => {
       <div className="space-y-5">
         <div>
           <label className="text-[10px] uppercase tracking-widest text-white/40 ml-1">Nome Completo</label>
-          <input 
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-sage outline-none transition-colors"
+          <input
+            className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:border-sage outline-none transition-colors ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
             placeholder="Ex: Maria Silva"
             value={form.name}
-            onChange={(e) => setForm({...form, name: e.target.value})}
+            onChange={(e) => { setForm({...form, name: e.target.value}); setErrors(prev => ({ ...prev, name: '' })); }}
           />
+          {errors.name && <p className="text-[10px] text-red-400/80 mt-1 ml-1">{errors.name}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-[10px] uppercase tracking-widest text-white/40 ml-1">CPF</label>
-            <input 
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-sage outline-none"
+            <input
+              className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:border-sage outline-none ${errors.cpf ? 'border-red-400/50' : 'border-white/10'}`}
               placeholder="000.000.000-00"
-              onChange={(e) => setForm({...form, cpf: e.target.value})}
+              onChange={(e) => { setForm({...form, cpf: e.target.value}); setErrors(prev => ({ ...prev, cpf: '' })); }}
             />
+            {errors.cpf && <p className="text-[10px] text-red-400/80 mt-1 ml-1">{errors.cpf}</p>}
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-widest text-white/40 ml-1">Telefone</label>
-            <input 
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-sage outline-none"
-              placeholder="(11) 99999-9999"
-              onChange={(e) => setForm({...form, phone: e.target.value})}
+            <input
+              className={`w-full bg-white/5 border rounded-xl px-4 py-3 focus:border-sage outline-none ${errors.phone ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="(85) 99999-9999"
+              onChange={(e) => { setForm({...form, phone: e.target.value}); setErrors(prev => ({ ...prev, phone: '' })); }}
             />
+            {errors.phone && <p className="text-[10px] text-red-400/80 mt-1 ml-1">{errors.phone}</p>}
           </div>
         </div>
 
@@ -92,7 +122,7 @@ const ProfileSetupView: React.FC<Props> = ({ onComplete }) => {
 
       <button 
         disabled={!isFormValid}
-        onClick={() => onComplete(form as PatientProfile)}
+        onClick={handleSubmit}
         className={`mt-8 w-full py-4 bg-sage text-[#1A1A1B] font-semibold rounded-2xl transition-all shadow-lg shadow-sage/10 ${!isFormValid ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sage/90'}`}
       >
         Continuar para Anamnese

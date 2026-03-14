@@ -1,16 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { PatientRecord, Reminder, AdminUser } from '../types';
-import { getGeminiSummaryForClinic } from '../services/geminiService';
-import { getWebhooks, saveWebhooks, sendPatientToWebhooks, WebhookConfig } from '../services/webhookService';
-import {
-  PopupCampaign,
-  getCampaigns,
-  saveCampaigns,
-  showBrowserNotification,
-} from '../services/notificationService';
+import { PopupCampaign, showBrowserNotification } from '../services/notificationService';
 import { getEngagement, getLocation, getSessionContexts, getNavHistory } from '../services/analyticsService';
-import { getAdminUsers, saveAdminUsers } from '../services/adminAuthService';
+import { getAdminUsers, createAdminUser, deleteAdminUser } from '../services/adminAuthService';
+import { sendPatientToWebhooks } from '../services/webhookService';
+import * as api from '../services/apiService';
+import { CONFIG } from '../services/config';
 
 interface Props {
   currentAdmin: AdminUser;
@@ -55,15 +51,25 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
   const [fComm, setFComm]             = useState<'tecnico' | 'simples'>('simples');
 
   // ── Webhooks ───────────────────────────────────────────────────────────────
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>(getWebhooks);
+  const [webhooks, setWebhooks] = useState<api.WebhookConfig[]>([]);
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
   const [newWebhookLabel, setNewWebhookLabel] = useState('');
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const data = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-    setRecords(data);
-    setCampaigns(getCampaigns());
+    const loadData = async () => {
+      try {
+        const patients = await api.getAllPatients();
+        setRecords(patients);
+        const camps = await api.getCampaigns();
+        setCampaigns(camps);
+        const wh = await api.getWebhooks();
+        setWebhooks(wh);
+      } catch (err) {
+        console.error('[JornadaVip] Erro ao carregar dados admin:', err);
+      }
+    };
+    loadData();
   }, []);
 
   // ── Helpers: Formulário de Paciente ───────────────────────────────────────
@@ -89,40 +95,40 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
     setSelectedRecord(null);
   };
 
-  const handleSavePatient = () => {
+  const handleSavePatient = async () => {
     if (!fName || !fPhone) return;
-    const all: PatientRecord[] = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-
-    if (editingId) {
-      // Edição
-      const updated = all.map(r =>
-        r.profile.id === editingId
-          ? { ...r, profile: { ...r.profile, name: fName, phone: fPhone, email: fEmail, cpf: fCpf, birthDate: fBirth, city: fCity, objective: fObjective, style: fStyle, commPreference: fComm } }
-          : r
-      );
-      localStorage.setItem('clinic_records', JSON.stringify(updated));
-      setRecords(updated);
-    } else {
-      // Novo cadastro
-      const emptyAnamnesis = { healthGeneral: '', allergies: '', medications: '', pregnancy: false, pastProcedures: '', habits: { sun: '', sleep: '', smoking: false, skincare: '' }, expectedResult: '' };
-      const newRecord: PatientRecord = {
-        profile: { id: Math.random().toString(36).substr(2, 9), name: fName, phone: fPhone, email: fEmail, cpf: fCpf, birthDate: fBirth, city: fCity, objective: fObjective, style: fStyle, commPreference: fComm, createdAt: new Date().toISOString() },
-        anamnesis: emptyAnamnesis,
-        reminders: [],
-      };
-      const updated = [...all, newRecord];
-      localStorage.setItem('clinic_records', JSON.stringify(updated));
-      setRecords(updated);
+    try {
+      if (editingId) {
+        const updated = await api.updatePatient(editingId, {
+          name: fName, phone: fPhone, email: fEmail, cpf: fCpf,
+          birthDate: fBirth, city: fCity, objective: fObjective,
+          style: fStyle, commPreference: fComm,
+        });
+        if (updated) {
+          setRecords(prev => prev.map(r => r.profile.id === editingId ? updated : r));
+        }
+      } else {
+        const newRecord = await api.createPatient({
+          name: fName, phone: fPhone, email: fEmail, cpf: fCpf,
+          birthDate: fBirth, city: fCity, objective: fObjective,
+          style: fStyle, commPreference: fComm,
+        });
+        setRecords(prev => [...prev, newRecord]);
+      }
+      clearPatientForm();
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao salvar paciente:', err);
+      alert('Erro ao salvar paciente. Tente novamente.');
     }
-    clearPatientForm();
   };
 
-  const handleDeletePatient = (id: string) => {
+  const handleDeletePatient = async (id: string) => {
     if (!confirm('Remover este paciente permanentemente?')) return;
-    const updated = records.filter(r => r.profile.id !== id);
-    localStorage.setItem('clinic_records', JSON.stringify(updated));
-    setRecords(updated);
-    if (selectedRecord?.profile.id === id) setSelectedRecord(null);
+    const success = await api.deletePatient(id);
+    if (success) {
+      setRecords(prev => prev.filter(r => r.profile.id !== id));
+      if (selectedRecord?.profile.id === id) setSelectedRecord(null);
+    }
   };
 
   // ── Handlers: Pacientes ────────────────────────────────────────────────────
@@ -130,36 +136,37 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
     setSelectedRecord(record);
     setAiSummary(null);
     setLoadingAi(true);
-    const summary = await getGeminiSummaryForClinic(record.profile, record.anamnesis);
-    setAiSummary(summary || 'Sem resumo disponível.');
+    try {
+      const summary = await api.aiSummary(record.profile, record.anamnesis);
+      setAiSummary(summary || 'Sem resumo disponível.');
+    } catch (err) {
+      setAiSummary('Erro ao gerar resumo da IA.');
+    }
     setLoadingAi(false);
   };
 
-  const handleSendReminder = () => {
+  const handleSendReminder = async () => {
     if (!selectedRecord || !remTitle || !remMsg) return;
-    const newReminder: Reminder = {
-      id: Math.random().toString(36).substr(2, 9),
-      patientId: selectedRecord.profile.id,
-      title: remTitle,
-      message: remMsg,
-      date: new Date().toISOString(),
-      type: 'orientacao',
-      read: false,
-    };
-    const updatedRecords = records.map(r =>
-      r.profile.id === selectedRecord.profile.id
-        ? { ...r, reminders: [...(r.reminders || []), newReminder] }
-        : r
-    );
-    localStorage.setItem('clinic_records', JSON.stringify(updatedRecords));
-    setRecords(updatedRecords);
-    setSelectedRecord({ ...selectedRecord, reminders: [...(selectedRecord.reminders || []), newReminder] });
-    setRemTitle('');
-    setRemMsg('');
-
-    // Também envia notificação do browser se possível
-    showBrowserNotification(remTitle, remMsg);
-    alert('Lembrete salvo e notificação enviada!');
+    try {
+      const newReminder = await api.createReminder(selectedRecord.profile.id, {
+        title: remTitle,
+        message: remMsg,
+        date: new Date().toISOString(),
+        type: 'orientacao',
+      });
+      setRecords(prev => prev.map(r =>
+        r.profile.id === selectedRecord.profile.id
+          ? { ...r, reminders: [...(r.reminders || []), newReminder] }
+          : r
+      ));
+      setSelectedRecord({ ...selectedRecord, reminders: [...(selectedRecord.reminders || []), newReminder] });
+      setRemTitle('');
+      setRemMsg('');
+      showBrowserNotification(remTitle, remMsg);
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao criar lembrete:', err);
+      alert('Erro ao enviar lembrete.');
+    }
   };
 
   const handleTestWebhooks = async () => {
@@ -172,36 +179,33 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
   };
 
   // ── Handlers: Campanhas ────────────────────────────────────────────────────
-  const handleCreateCampaign = () => {
+  const handleCreateCampaign = async () => {
     if (!campTitle || !campMsg) return;
-    const newCampaign: PopupCampaign = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: campTitle,
-      message: campMsg,
-      imageUrl: campImageUrl || undefined,
-      ctaLabel: campCtaLabel || undefined,
-      ctaUrl: campCtaUrl || undefined,
-      targetPatientIds: campTarget === 'all' ? 'all' : campSelectedIds,
-      createdAt: new Date().toISOString(),
-      scheduledAt: campScheduled || undefined,
-      readBy: [],
-    };
-    const updated = [...campaigns, newCampaign];
-    setCampaigns(updated);
-    saveCampaigns(updated);
-    setCampTitle(''); setCampMsg(''); setCampImageUrl('');
-    setCampCtaLabel(''); setCampCtaUrl(''); setCampScheduled('');
-    setCampSelectedIds([]);
-
-    // Tenta notificar via browser
-    showBrowserNotification(campTitle, campMsg);
-    alert('Campanha criada! Aparecerá para os pacientes ao abrirem o app.');
+    try {
+      const newCampaign = await api.createCampaign({
+        title: campTitle,
+        message: campMsg,
+        imageUrl: campImageUrl || undefined,
+        ctaLabel: campCtaLabel || undefined,
+        ctaUrl: campCtaUrl || undefined,
+        targetPatientIds: campTarget === 'all' ? 'all' : campSelectedIds,
+        scheduledAt: campScheduled || undefined,
+      });
+      setCampaigns(prev => [...prev, newCampaign]);
+      setCampTitle(''); setCampMsg(''); setCampImageUrl('');
+      setCampCtaLabel(''); setCampCtaUrl(''); setCampScheduled('');
+      setCampSelectedIds([]);
+      showBrowserNotification(campTitle, campMsg);
+    } catch (err) {
+      console.error('[JornadaVip] Erro ao criar campanha:', err);
+      alert('Erro ao criar campanha.');
+    }
   };
 
   const handleDeleteCampaign = (id: string) => {
     const updated = campaigns.filter(c => c.id !== id);
     setCampaigns(updated);
-    saveCampaigns(updated);
+    localStorage.setItem(CONFIG.LS_KEYS.CAMPAIGNS, JSON.stringify(updated));
   };
 
   const togglePatientSelection = (id: string) => {
@@ -211,32 +215,39 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
   };
 
   // ── Handlers: Webhooks ─────────────────────────────────────────────────────
-  const handleAddWebhook = () => {
+  const handleAddWebhook = async () => {
     if (!newWebhookUrl || !newWebhookLabel) return;
-    const updated = [...webhooks, { url: newWebhookUrl, label: newWebhookLabel, enabled: true }];
+    const newWh: api.WebhookConfig = { id: `wh-${Date.now().toString(36)}`, url: newWebhookUrl, label: newWebhookLabel, enabled: true };
+    const updated = [...webhooks, newWh];
     setWebhooks(updated);
-    saveWebhooks(updated);
+    await api.saveWebhookConfig(updated);
     setNewWebhookUrl(''); setNewWebhookLabel('');
   };
 
-  const handleToggleWebhook = (i: number) => {
+  const handleToggleWebhook = async (i: number) => {
     const updated = webhooks.map((w, idx) => idx === i ? { ...w, enabled: !w.enabled } : w);
-    setWebhooks(updated); saveWebhooks(updated);
+    setWebhooks(updated);
+    await api.saveWebhookConfig(updated);
   };
 
-  const handleRemoveWebhook = (i: number) => {
+  const handleRemoveWebhook = async (i: number) => {
     const updated = webhooks.filter((_, idx) => idx !== i);
-    setWebhooks(updated); saveWebhooks(updated);
+    setWebhooks(updated);
+    await api.saveWebhookConfig(updated);
   };
 
   // ── Estado: Usuários ──────────────────────────────────────────────────────
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>(getAdminUsers);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [showUserForm, setShowUserForm]     = useState(false);
   const [editingUserId, setEditingUserId]   = useState<string | null>(null);
   const [uName, setUName]                   = useState('');
   const [uUsername, setUUsername]           = useState('');
   const [uPassword, setUPassword]           = useState('');
   const [uRole, setURole]                   = useState<'master' | 'colaborador'>('colaborador');
+
+  useEffect(() => {
+    setAdminUsers(getAdminUsers());
+  }, []);
 
   const clearUserForm = () => {
     setUName(''); setUUsername(''); setUPassword(''); setURole('colaborador');
@@ -248,26 +259,31 @@ const AdminView: React.FC<Props> = ({ currentAdmin, onBack }) => {
     setEditingUserId(u.id); setShowUserForm(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!uName || !uUsername || !uPassword) return;
-    let updated: AdminUser[];
-    if (editingUserId) {
-      updated = adminUsers.map(u => u.id === editingUserId ? { ...u, name: uName, username: uUsername, password: uPassword, role: uRole } : u);
-    } else {
-      const newUser: AdminUser = { id: Math.random().toString(36).substr(2, 9), name: uName, username: uUsername, password: uPassword, role: uRole, createdAt: new Date().toISOString() };
-      updated = [...adminUsers, newUser];
+    try {
+      if (editingUserId) {
+        alert('Edição de usuário disponível em breve via CRM.');
+        clearUserForm();
+        return;
+      }
+      const newUser = await createAdminUser(uName, uUsername, uPassword, uRole);
+      setAdminUsers(prev => [...prev, newUser]);
+      clearUserForm();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao criar usuário.');
     }
-    saveAdminUsers(updated);
-    setAdminUsers(updated);
-    clearUserForm();
   };
 
   const handleDeleteUser = (id: string) => {
     if (id === currentAdmin.id) { alert('Você não pode remover sua própria conta.'); return; }
     if (!confirm('Remover este usuário?')) return;
-    const updated = adminUsers.filter(u => u.id !== id);
-    saveAdminUsers(updated);
-    setAdminUsers(updated);
+    const success = deleteAdminUser(id);
+    if (success) {
+      setAdminUsers(prev => prev.filter(u => u.id !== id));
+    } else {
+      alert('Não foi possível remover. Pode ser o último administrador master.');
+    }
   };
 
   // ── Tabs (Usuários só para master) ────────────────────────────────────────

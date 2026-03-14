@@ -4,15 +4,15 @@ import { PatientProfile, RewardPoints, AppStep, Reminder } from '../types';
 import {
   requestNotificationPermission,
   getNotificationPermission,
-  getPendingCampaignsForPatient,
-  markCampaignAsRead,
   PopupCampaign,
 } from '../services/notificationService';
 import { trackScreen, trackFeature, trackNotificationOpened } from '../services/analyticsService';
+import { CONFIG } from '../services/config';
+import * as api from '../services/apiService';
 
-const WHATSAPP_NUMBER = '5500000000000'; // Configure com o número da clínica
-const INSTAGRAM_URL = 'https://instagram.com/clubvip'; // Atualize com o Instagram real
-const YOUTUBE_URL = 'https://youtube.com/@clubvip'; // Atualize com o YouTube real
+const WHATSAPP_NUMBER = CONFIG.WHATSAPP_NUMBER;
+const INSTAGRAM_URL = CONFIG.INSTAGRAM_URL;
+const YOUTUBE_URL = CONFIG.YOUTUBE_URL;
 
 interface Props {
   profile: PatientProfile;
@@ -34,23 +34,29 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
   useEffect(() => {
     trackScreen(profile.id, 'dashboard');
 
-    // Verificar lembrete pendente (enviado individualmente pelo admin)
-    const allRecords = JSON.parse(localStorage.getItem('clinic_records') || '[]');
-    const myRecord = allRecords.find((r: any) => r.profile.id === profile.id);
+    // Carregar dados via apiService (funciona com localStorage ou backend)
+    const loadData = async () => {
+      try {
+        // Verificar anamnese
+        const anamnesis = await api.getAnamnesis(profile.id);
+        if (!anamnesis) setAnamnesisComplete(false);
 
-    // Verificar se anamnese foi concluída
-    if (!myRecord?.anamnesis) setAnamnesisComplete(false);
-    if (myRecord?.reminders?.length > 0) {
-      const unread = myRecord.reminders.find((rem: Reminder) => !rem.read);
-      if (unread) setActiveReminder(unread);
-    }
+        // Verificar lembretes pendentes
+        const reminders = await api.getReminders(profile.id);
+        const unread = reminders.find((rem: Reminder) => !rem.read);
+        if (unread) setActiveReminder(unread);
 
-    // Verificar campanhas pendentes
-    const pending = getPendingCampaignsForPatient(profile.id);
-    if (pending.length > 0) {
-      setCampaignQueue(pending);
-      setActiveCampaign(pending[0]);
-    }
+        // Verificar campanhas pendentes
+        const pending = await api.getPendingCampaigns(profile.id);
+        if (pending.length > 0) {
+          setCampaignQueue(pending);
+          setActiveCampaign(pending[0]);
+        }
+      } catch (err) {
+        console.error('[JornadaVip] Erro ao carregar dados do dashboard:', err);
+      }
+    };
+    loadData();
 
     // Exibir banner para pedir permissão de notificação
     if (getNotificationPermission() === 'default') {
@@ -60,9 +66,9 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
 
   const closeReminder = () => setActiveReminder(null);
 
-  const closeCampaign = () => {
+  const closeCampaign = async () => {
     if (!activeCampaign) return;
-    markCampaignAsRead(activeCampaign.id, profile.id);
+    await api.markCampaignRead(activeCampaign.id, profile.id);
     trackNotificationOpened(profile.id, activeCampaign.id);
     const rest = campaignQueue.filter(c => c.id !== activeCampaign.id);
     setCampaignQueue(rest);
