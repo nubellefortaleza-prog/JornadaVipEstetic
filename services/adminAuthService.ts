@@ -38,7 +38,7 @@ interface LoginAttempts {
 }
 
 const getLoginAttempts = (): LoginAttempts => {
-  const stored = sessionStorage.getItem(LOGIN_ATTEMPTS_KEY);
+  const stored = localStorage.getItem(LOGIN_ATTEMPTS_KEY);
   if (!stored) return { count: 0, firstAttempt: 0, lockedUntil: null };
   return JSON.parse(stored);
 };
@@ -49,7 +49,7 @@ const recordFailedAttempt = (): { locked: boolean; remainingMinutes: number } =>
 
   // Reset se passou mais de 15 min desde a primeira tentativa
   if (attempts.firstAttempt && now - attempts.firstAttempt > LOCKOUT_MINUTES * 60 * 1000) {
-    sessionStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify({
+    localStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify({
       count: 1, firstAttempt: now, lockedUntil: null,
     }));
     return { locked: false, remainingMinutes: 0 };
@@ -58,7 +58,7 @@ const recordFailedAttempt = (): { locked: boolean; remainingMinutes: number } =>
   const newCount = attempts.count + 1;
   const lockedUntil = newCount >= MAX_ATTEMPTS ? now + LOCKOUT_MINUTES * 60 * 1000 : null;
 
-  sessionStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify({
+  localStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify({
     count: newCount,
     firstAttempt: attempts.firstAttempt || now,
     lockedUntil,
@@ -71,7 +71,7 @@ const recordFailedAttempt = (): { locked: boolean; remainingMinutes: number } =>
 };
 
 const clearLoginAttempts = (): void => {
-  sessionStorage.removeItem(LOGIN_ATTEMPTS_KEY);
+  localStorage.removeItem(LOGIN_ATTEMPTS_KEY);
 };
 
 export const checkRateLimit = (): { locked: boolean; remainingMinutes: number } => {
@@ -279,7 +279,7 @@ export const getAdminUsers = (): AdminUser[] => {
   return getStoredUsers().map(toPublicUser);
 };
 
-// ── Session (sessionStorage) ────────────────────────────────────────────────
+// ── Session (localStorage) ────────────────────────────────────────────────
 
 interface AdminSession {
   user: AdminUser;
@@ -287,7 +287,7 @@ interface AdminSession {
 }
 
 export const getAdminSession = (): AdminUser | null => {
-  const s = sessionStorage.getItem(SESSION_KEY);
+  const s = localStorage.getItem(SESSION_KEY);
   if (!s) return null;
   try {
     const session: AdminSession = JSON.parse(s);
@@ -308,11 +308,11 @@ export const setAdminSession = (user: AdminUser): void => {
     user,
     expiresAt: Date.now() + CONFIG.SESSION_EXPIRY_MS,
   };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 };
 
 export const clearAdminSession = (): void => {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
 };
 
 // ── Helpers internos ────────────────────────────────────────────────────────

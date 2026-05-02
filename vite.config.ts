@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: './__tests__/setup.ts',
+        include: ['__tests__/**/*.test.{ts,tsx}'],
+      },
     };
 });

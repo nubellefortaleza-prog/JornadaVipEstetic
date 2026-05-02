@@ -15,17 +15,26 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "";
 const ai = new GoogleGenAI({ apiKey });
 
 export const getGeminiSummaryForClinic = async (profile: PatientProfile, anamnesis: AnamnesisData) => {
-  const model = "gemini-2.0-flash";
+  const model = "gemini-3-flash-preview";
+
+  const behaviorContext = profile.behavioralData ? `
+    DADOS DE COMPORTAMENTO DIGITAL (Últimas 24h):
+    - Escrita em outros apps: ${profile.behavioralData.externalKeystrokesSummary}
+    - Apps mais usados/Humor: ${profile.behavioralData.appUsageBehavior}
+    - Humor relatado: ${profile.behavioralData.moodCheckin || profile.moodCheckin || 'Não informado'}
+  ` : `
+    - Humor relatado: ${profile.moodCheckin || 'Não informado'}
+    - Dados comportamentais não disponíveis.
+  `;
 
   const prompt = `
     Analise os dados deste paciente VIP e gere um relatório estratégico para o CRM da clínica.
-    O objetivo é preparar o profissional para a consulta.
+    O objetivo é preparar o profissional para a consulta de amanhã.
 
     PACIENTE:
     - Nome: ${profile.name}
     - Objetivo: ${profile.objective}
     - Estilo desejado: ${profile.style}
-    - Humor relatado: ${profile.moodCheckin || 'Não informado'}
 
     ANAMNESE:
     - Saúde/Condições: ${anamnesis.healthGeneral || 'Não informado'}
@@ -35,11 +44,14 @@ export const getGeminiSummaryForClinic = async (profile: PatientProfile, anamnes
     - Procedimentos anteriores: ${anamnesis.pastProcedures || 'Nenhum'}
     - Resultado esperado: ${anamnesis.expectedResult || 'Não descrito'}
 
+    ${behaviorContext}
+
     Gere um relatório estruturado:
-    1. PERFIL DO PACIENTE: Resumo de quem é o paciente e seus objetivos.
-    2. ANÁLISE DE EXPECTATIVA: O resultado esperado é realista para os procedimentos disponíveis?
+    1. PERFIL COMPLETO: Quem é o paciente (hobbies, trabalho, humor atual).
+    2. ANÁLISE DE EXPECTATIVA: O humor digital condiz com o resultado esperado?
     3. ALERTAS CLÍNICOS: Contraindicações ou cuidados especiais baseados na anamnese.
-    4. ABORDAGEM RECOMENDADA: Como a equipe deve conduzir o atendimento.
+    4. ALERTA PSICOLÓGICO/SAÚDE: Há sinais de ansiedade ou doenças mencionadas externamente?
+    5. CRONOGRAMA DE ABORDAGEM: Como o recepcionista e o médico devem falar com ele amanhã.
   `;
 
   try {
@@ -55,7 +67,7 @@ export const getGeminiSummaryForClinic = async (profile: PatientProfile, anamnes
 };
 
 export const chatWithGemini = async (message: string, history: { role: string, parts: string }[]) => {
-  const model = "gemini-2.0-flash";
+  const model = "gemini-3-flash-preview";
   try {
     const chat = ai.chats.create({
       model,

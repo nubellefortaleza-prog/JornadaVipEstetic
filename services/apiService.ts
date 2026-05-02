@@ -353,37 +353,83 @@ export interface PatientLoginResult {
   success: boolean;
   patient?: PatientRecord;
   isNewPatient?: boolean;
+  found?: boolean;
   error?: string;
 }
 
+/**
+ * Login via OAuth (Google/Apple).
+ * Backend busca paciente pelo email do provider.
+ * Retorna found:true se encontrou, found:false se é email desconhecido.
+ */
 export const patientLogin = async (
   provider: 'google' | 'apple',
   oauthToken: string,
+  email: string,
+  name: string,
+  photoUrl?: string,
 ): Promise<PatientLoginResult> => {
   if (hasBackend()) {
     const res = await httpClient<{
       patient: PatientRecord;
       isNewPatient: boolean;
+      found: boolean;
       accessToken: string;
       refreshToken: string;
     }>('/api/jornada/auth/patient-login', {
       method: 'POST',
-      body: { provider, token: oauthToken },
+      body: { provider, token: oauthToken, email, name, photoUrl },
       skipAuth: true,
     });
     if (res.success && res.data) {
-      setTokens(res.data.accessToken, res.data.refreshToken);
+      if (res.data.found) {
+        setTokens(res.data.accessToken, res.data.refreshToken);
+      }
       return {
         success: true,
         patient: res.data.patient,
         isNewPatient: res.data.isNewPatient,
+        found: res.data.found,
       };
     }
     return { success: false, error: res.error || 'Falha no login' };
   }
 
-  // Modo local: simula login (mesmo comportamento atual)
-  return { success: true, isNewPatient: true };
+  // Modo local: simula — email não existe, paciente novo
+  return { success: true, found: false, isNewPatient: true };
+};
+
+/**
+ * Vincula conta OAuth a paciente existente via CPF.
+ * Usado quando o email do OAuth não bate com o email cadastrado no CRM.
+ */
+export const linkPatientByCpf = async (
+  cpf: string,
+  provider: 'google' | 'apple',
+  oauthToken: string,
+  email: string,
+  name: string,
+  photoUrl?: string,
+): Promise<PatientLoginResult> => {
+  if (hasBackend()) {
+    const res = await httpClient<{
+      patient: PatientRecord;
+      accessToken: string;
+      refreshToken: string;
+    }>('/api/jornada/auth/link-cpf', {
+      method: 'POST',
+      body: { cpf, provider, token: oauthToken, email, name, photoUrl },
+      skipAuth: true,
+    });
+    if (res.success && res.data) {
+      setTokens(res.data.accessToken, res.data.refreshToken);
+      return { success: true, patient: res.data.patient, found: true };
+    }
+    return { success: false, found: false, error: res.error || 'CPF não encontrado' };
+  }
+
+  // Modo local: simula CPF não encontrado
+  return { success: false, found: false, error: 'Backend não disponível. Configure VITE_API_BASE_URL.' };
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

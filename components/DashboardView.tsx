@@ -186,12 +186,21 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-sm font-light text-white/60">Olá, {firstName}</h2>
+          <h2 className="text-sm font-light text-white/60">Ola, {firstName}</h2>
           <p className="text-lg font-serif">Sua Jornada VIP</p>
         </div>
-        <div className="bg-sage/10 border border-sage/20 rounded-full px-4 py-2 flex items-center space-x-2">
-          <span className="text-xs font-semibold text-sage">{rewards.total} pts</span>
-          <div className="w-2 h-2 rounded-full bg-sage animate-pulse" />
+        <div className="flex items-center gap-3">
+          <div className="bg-sage/10 border border-sage/20 rounded-full px-4 py-2 flex items-center space-x-2">
+            <span className="text-xs font-semibold text-sage">{rewards.total} pts</span>
+            <div className="w-2 h-2 rounded-full bg-sage animate-pulse" />
+          </div>
+          {profile.photoUrl ? (
+            <img src={profile.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-[#AABAA4]/30" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-[#AABAA4]/20 flex items-center justify-center text-[#AABAA4] text-sm font-bold">
+              {firstName.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
       </div>
 

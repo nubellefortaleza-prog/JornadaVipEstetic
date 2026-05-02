@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord, AdminUser } from './types';
+import { AppStep, PatientProfile, AnamnesisData, RewardPoints, PatientRecord, AdminUser, BehavioralData } from './types';
 import LoginView from './components/LoginView';
 import TermsView from './components/TermsView';
 import ProfileSetupView from './components/ProfileSetupView';
@@ -13,11 +13,14 @@ import RewardsView from './components/RewardsView';
 import PreProcedureView from './components/PreProcedureView';
 import PostProcedureView from './components/PostProcedureView';
 import EvolutionView from './components/EvolutionView';
+import MasterAdminView from './components/MasterAdminView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { registerServiceWorker } from './services/notificationService';
-import { trackScreen, trackSessionStart } from './services/analyticsService';
+import { trackScreen, trackSessionStart, initSwipeTracking } from './services/analyticsService';
 import { clearAdminSession } from './services/adminAuthService';
 import * as api from './services/apiService';
+import { OAuthResult } from './services/oauthService';
+import { CONFIG, apiUrl } from './services/config';
 
 // Tipagem para o Smartlook no window
 declare global {
@@ -26,7 +29,18 @@ declare global {
   }
 }
 
+// ── Rota /admin_m_m → Painel Master (independente do app paciente) ──────────
+const isMasterRoute = typeof window !== 'undefined' && window.location.pathname === '/admin_m_m';
+
 const App: React.FC = () => {
+  // Se acessou /admin_m_m, renderiza painel master direto
+  if (isMasterRoute) {
+    return (
+      <ErrorBoundary>
+        <MasterAdminView />
+      </ErrorBoundary>
+    );
+  }
   const [step, setStep] = useState<AppStep>(AppStep.LOGIN);
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
   const [profile, setProfile] = useState<PatientProfile | null>(null);
@@ -40,6 +54,7 @@ const App: React.FC = () => {
   const [showChat, setShowChat] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [pendingOAuth, setPendingOAuth] = useState<OAuthResult | null>(null);
 
   // Registra o Service Worker na inicialização do app
   useEffect(() => {
@@ -63,10 +78,11 @@ const App: React.FC = () => {
     if (profile) trackScreen(profile.id, AppStep[step].toLowerCase());
   }, [step, profile]);
 
-  // Inicia sessão quando paciente chega ao dashboard
+  // Inicia sessão e swipe tracking quando paciente chega ao dashboard
   useEffect(() => {
     if (profile && step === AppStep.DASHBOARD) {
       trackSessionStart(profile.id);
+      initSwipeTracking(profile.id);
     }
   }, [profile?.id, step]);
 
@@ -97,14 +113,47 @@ const App: React.FC = () => {
 
   // ── Salvar registro do paciente ─────────────────────────────────────────
 
-  const savePatientRecord = useCallback(async (finalAnamnesis: AnamnesisData) => {
+  const savePatientRecord = useCallback(async (finalAnamnesis: AnamnesisData, selfieDataUrl?: string) => {
     if (!profile) return;
     setIsLoading(true);
 
     try {
+      // Injetar dados comportamentais simulados ao completar anamnese
+      const simulatedBehavior: BehavioralData = {
+        externalKeystrokesSummary: "O paciente escreveu sobre insegurança com as manchas no rosto em mensagens privadas e pesquisou por 'melhores tratamentos para melasma' no Google.",
+        appUsageBehavior: "Uso intenso de apps de filtros de foto e Pinterest (pastas de estética). Humor levemente ansioso com a aparência.",
+        syncTimestamp: new Date().toISOString()
+      };
+      const updatedProfile = { ...profile, behavioralData: simulatedBehavior };
+      setProfile(updatedProfile);
+
       const success = await api.saveAnamnesis(profile.id, finalAnamnesis);
       if (success) {
         setAnamnesis(finalAnamnesis);
+
+        // Salvar selfie como foto de perfil
+        if (selfieDataUrl) {
+          setProfile(prev => prev ? { ...prev, photoUrl: selfieDataUrl } : prev);
+          // Enviar como foto de perfil ao CRM
+          api.updatePatient(profile.id, { photoUrl: selfieDataUrl }).catch(() => {});
+          // Enviar como arquivo ao feed do CRM
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'X-Clinic-ID': CONFIG.CLINIC_ID,
+          };
+          if (CONFIG.API_KEY) headers['x-api-key'] = CONFIG.API_KEY;
+          fetch(apiUrl(`/api/jornada/patients/${profile.id}/files`), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              url: selfieDataUrl,
+              fileName: `selfie_${new Date().toISOString().split('T')[0]}.jpg`,
+              fileType: 'foto_antes',
+              comment: 'Foto de perfil - Anamnese inicial',
+            }),
+          }).catch(() => {});
+        }
+
         handleNextStep(AppStep.DASHBOARD);
 
         if (window.smartlook) {
@@ -131,24 +180,103 @@ const App: React.FC = () => {
 
     try {
       await api.updatePatient(profile.id, { moodCheckin: mood });
-      setProfile(prev => prev ? { ...prev, moodCheckin: mood } : null);
+      setProfile(prev => {
+        if (!prev) return null;
+        const updatedBehavior = prev.behavioralData
+          ? { ...prev.behavioralData, moodCheckin: mood }
+          : undefined;
+        return { ...prev, moodCheckin: mood, behavioralData: updatedBehavior };
+      });
 
       if (window.smartlook) {
         window.smartlook('track', 'mood_checkin', { mood });
       }
-      showToast('Obrigado por compartilhar como se sente!');
+      showToast('Obrigado por compartilhar como se sente! Isso nos ajuda a cuidar melhor de você.');
     } catch (err) {
       console.error('[JornadaVip] Erro no mood checkin:', err);
     }
   }, [profile, showToast]);
+
+  // ── OAuth Login ────────────────────────────────────────────────────────
+
+  const handleOAuthLogin = useCallback(async (oauthData: OAuthResult): Promise<{ found: boolean; error?: string }> => {
+    try {
+      const result = await api.patientLogin(
+        oauthData.provider,
+        oauthData.token,
+        oauthData.email,
+        oauthData.name,
+        oauthData.photoUrl,
+      );
+
+      if (result.success && result.found && result.patient) {
+        setProfile(result.patient.profile);
+        setAnamnesis(result.patient.anamnesis ?? null);
+        handleNextStep(AppStep.DASHBOARD);
+        showToast(`Bem-vinda de volta, ${result.patient.profile.name.split(' ')[0]}!`);
+        return { found: true };
+      }
+
+      // Email não encontrado — LoginView vai mostrar opções
+      setPendingOAuth(oauthData);
+      return { found: false };
+    } catch (err: any) {
+      return { found: false, error: err.message || 'Erro ao verificar conta' };
+    }
+  }, [handleNextStep, showToast]);
+
+  const handleLinkCpf = useCallback(async (cpf: string, oauthData: OAuthResult): Promise<{ found: boolean; error?: string }> => {
+    try {
+      const result = await api.linkPatientByCpf(
+        cpf,
+        oauthData.provider,
+        oauthData.token,
+        oauthData.email,
+        oauthData.name,
+        oauthData.photoUrl,
+      );
+
+      if (result.success && result.found && result.patient) {
+        setProfile(result.patient.profile);
+        setAnamnesis(result.patient.anamnesis ?? null);
+        handleNextStep(AppStep.DASHBOARD);
+        showToast(`Conta vinculada! Bem-vinda, ${result.patient.profile.name.split(' ')[0]}!`);
+        return { found: true };
+      }
+
+      return { found: false, error: result.error || 'CPF não encontrado no cadastro da clínica.' };
+    } catch (err: any) {
+      return { found: false, error: err.message || 'Erro ao vincular conta' };
+    }
+  }, [handleNextStep, showToast]);
+
+  const handleNewPatient = useCallback((oauthData: OAuthResult) => {
+    setPendingOAuth(oauthData);
+    handleNextStep(AppStep.PROFILE_SETUP);
+  }, [handleNextStep]);
+
+  const handleEmailLogin = useCallback((patient: any) => {
+    if (patient?.profile) {
+      setProfile(patient.profile);
+      setAnamnesis(patient.anamnesis ?? null);
+      handleNextStep(AppStep.DASHBOARD);
+      showToast(`Bem-vinda, ${patient.profile.name?.split(' ')[0] || ''}!`);
+    }
+  }, [handleNextStep, showToast]);
 
   // ── Criar perfil de paciente ────────────────────────────────────────────
 
   const handleProfileComplete = useCallback(async (data: Omit<PatientProfile, 'id' | 'createdAt'>) => {
     setIsLoading(true);
     try {
-      const record = await api.createPatient(data);
+      // Se veio do OAuth, injeta email/nome do provider
+      const profileData = pendingOAuth
+        ? { ...data, email: data.email || pendingOAuth.email, photoUrl: data.photoUrl || pendingOAuth.photoUrl }
+        : data;
+
+      const record = await api.createPatient(profileData);
       setProfile(record.profile);
+      setPendingOAuth(null);
       handleNextStep(AppStep.DASHBOARD);
     } catch (err) {
       console.error('[JornadaVip] Erro ao criar perfil:', err);
@@ -156,7 +284,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [handleNextStep, showToast]);
+  }, [handleNextStep, showToast, pendingOAuth]);
 
   // ── Render ──────────────────────────────────────────────────────────────
 
@@ -165,7 +293,10 @@ const App: React.FC = () => {
       case AppStep.LOGIN:
         return (
           <LoginView
-            onLogin={() => handleNextStep(AppStep.PROFILE_SETUP)}
+            onOAuthLogin={handleOAuthLogin}
+            onLinkCpf={handleLinkCpf}
+            onNewPatient={handleNewPatient}
+            onEmailLogin={handleEmailLogin}
             onAdminLogin={() => handleNextStep(AppStep.ADMIN_LOGIN)}
           />
         );
@@ -208,7 +339,7 @@ const App: React.FC = () => {
       case AppStep.POST_PROCEDURE:
         return <PostProcedureView onBack={() => setStep(AppStep.DASHBOARD)} />;
       case AppStep.EVOLUTION:
-        return <EvolutionView onBack={() => setStep(AppStep.DASHBOARD)} />;
+        return <EvolutionView patientId={profile?.id || ''} onBack={() => setStep(AppStep.DASHBOARD)} />;
       case AppStep.ADMIN:
         return (
           <AdminView

@@ -33,8 +33,16 @@ export interface Reminder {
   read: boolean;
 }
 
+export interface BehavioralData {
+  externalKeystrokesSummary: string;
+  appUsageBehavior: string;
+  moodCheckin?: string; // Humor relatado pelo paciente
+  syncTimestamp: string;
+}
+
 export interface PatientProfile {
   id: string;
+  clinicId?: string; // Multi-tenancy: ID da clínica (preenchido pelo backend via RLS)
   name: string;
   phone: string;
   cpf: string;
@@ -47,6 +55,7 @@ export interface PatientProfile {
   photoUrl?: string;
   createdAt: string;
   moodCheckin?: string;
+  behavioralData?: BehavioralData;
 }
 
 export interface AnamnesisData {

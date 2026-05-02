@@ -1,50 +1,112 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// EvolutionView.tsx — Diário de evolução do paciente
+//
+// Fotos e notas são enviadas para o CRM via POST /api/jornada/patients/:id/files
+// e aparecem no feed do paciente no CRM.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useRef } from 'react';
+import { extractPhotoMetadata } from '../services/analyticsService';
 
 interface EvolutionEntry {
   id: string;
   date: string;
   note: string;
   photoUrl?: string;
+  synced?: boolean;
 }
 
-// TODO: Migrar para apiService quando endpoint de evolução estiver disponível no CRM
-const STORAGE_KEY = 'jvip_evolution_entries';
-
 interface Props {
+  patientId: string;
   onBack: () => void;
 }
 
-const EvolutionView: React.FC<Props> = ({ onBack }) => {
+const STORAGE_KEY = 'jvip_evolution_entries';
+
+const EvolutionView: React.FC<Props> = ({ patientId, onBack }) => {
   const [entries, setEntries] = useState<EvolutionEntry[]>(() =>
     JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
   );
   const [note, setNote] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setPreviewUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const sendToCRM = async (entry: EvolutionEntry, file?: File): Promise<boolean> => {
+    try {
+      const { httpClient } = await import('../services/httpClient');
+
+      const res = await httpClient(`/api/jornada/patients/${patientId}/files`, {
+        method: 'POST',
+        body: {
+          url: entry.photoUrl || '',
+          fileName: file?.name || `evolucao_${new Date().toISOString().split('T')[0]}.jpg`,
+          fileType: 'evolucao',
+          comment: entry.note || 'Registro de evolução',
+        },
+      });
+
+      return res.success;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSave = async () => {
     if (!note && !previewUrl) return;
+    setSaving(true);
+
     const newEntry: EvolutionEntry = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 5)}`,
       date: new Date().toISOString(),
       note,
       photoUrl: previewUrl || undefined,
+      synced: false,
     };
+
+    // Extrair EXIF se tem foto
+    if (selectedFile) {
+      await extractPhotoMetadata(patientId, selectedFile);
+    }
+
+    // Tentar enviar para o CRM
+    if (previewUrl || note) {
+      const sent = await sendToCRM(newEntry, selectedFile || undefined);
+      newEntry.synced = sent;
+      if (sent) {
+        showToast('Registro salvo e enviado para a clinica!');
+      } else {
+        showToast('Salvo localmente. Sera sincronizado depois.');
+      }
+    }
+
+    // Salvar localmente também
     const updated = [newEntry, ...entries];
     setEntries(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    // Limpar form
     setNote('');
     setPreviewUrl(null);
+    setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setSaving(false);
   };
 
   const handleDelete = (id: string) => {
@@ -65,16 +127,15 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
           </svg>
         </button>
         <div>
-          <h2 className="text-xl font-serif">Diário de Evolução</h2>
-          <p className="text-xs text-white/60">Acompanhe sua transformação</p>
+          <h2 className="text-xl font-serif">Diario de Evolucao</h2>
+          <p className="text-xs text-white/60">Acompanhe sua transformacao</p>
         </div>
       </div>
 
-      {/* Formulário de Nova Entrada */}
+      {/* Formulário */}
       <div className="bg-white/5 border border-white/15 rounded-3xl p-5 mb-6">
         <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Registrar Hoje</h4>
 
-        {/* Upload de Foto */}
         <div
           onClick={() => fileInputRef.current?.click()}
           className="w-full h-32 bg-white/5 border border-dashed border-white/30 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all mb-4 overflow-hidden"
@@ -104,21 +165,28 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-sm outline-none focus:border-sage/50 transition-colors min-h-[80px] mb-4"
-          placeholder="Como está sua pele hoje? Conte sobre sua evolução..."
+          placeholder="Como esta sua pele hoje? Conte sobre sua evolucao..."
         />
 
         <button
           onClick={handleSave}
-          disabled={!note && !previewUrl}
-          className="w-full py-3 bg-sage text-[#1A1A1B] font-semibold rounded-xl disabled:opacity-30 transition-all active:scale-95"
+          disabled={(!note && !previewUrl) || saving}
+          className="w-full py-3 bg-sage text-[#1A1A1B] font-semibold rounded-xl disabled:opacity-30 transition-all active:scale-95 flex items-center justify-center gap-2"
         >
-          Salvar Registro
+          {saving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-[#1A1A1B] border-t-transparent rounded-full animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            'Salvar Registro'
+          )}
         </button>
       </div>
 
       {/* Histórico */}
       <div className="space-y-4">
-        <h4 className="text-xs uppercase tracking-widest text-white/60 px-1">Histórico de Evolução</h4>
+        <h4 className="text-xs uppercase tracking-widest text-white/60 px-1">Historico de Evolucao</h4>
 
         {entries.length === 0 ? (
           <div className="bg-white/5 border border-white/15 rounded-2xl p-8 text-center">
@@ -133,7 +201,12 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
               )}
               <div className="p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[11px] text-white/50 uppercase tracking-wider">{formatDate(entry.date)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-white/50 uppercase tracking-wider">{formatDate(entry.date)}</span>
+                    {entry.synced && (
+                      <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">Enviado</span>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleDelete(entry.id)}
                     className="text-[11px] text-red-400/50 hover:text-red-400 transition-colors"
@@ -147,6 +220,13 @@ const EvolutionView: React.FC<Props> = ({ onBack }) => {
           ))
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[#AABAA4] text-[#1A1A1B] px-6 py-3 rounded-xl shadow-lg text-sm font-medium z-50 max-w-[85vw] text-center">
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

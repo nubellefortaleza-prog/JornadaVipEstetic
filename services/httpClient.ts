@@ -30,19 +30,19 @@ export class ApiError extends Error {
 // ── Token Management ────────────────────────────────────────────────────────
 
 const getToken = (): string | null =>
-  sessionStorage.getItem(CONFIG.AUTH_TOKEN_KEY);
+  localStorage.getItem(CONFIG.AUTH_TOKEN_KEY);
 
 const getRefreshToken = (): string | null =>
-  sessionStorage.getItem(CONFIG.AUTH_REFRESH_KEY);
+  localStorage.getItem(CONFIG.AUTH_REFRESH_KEY);
 
 export const setTokens = (access: string, refresh?: string): void => {
-  sessionStorage.setItem(CONFIG.AUTH_TOKEN_KEY, access);
-  if (refresh) sessionStorage.setItem(CONFIG.AUTH_REFRESH_KEY, refresh);
+  localStorage.setItem(CONFIG.AUTH_TOKEN_KEY, access);
+  if (refresh) localStorage.setItem(CONFIG.AUTH_REFRESH_KEY, refresh);
 };
 
 export const clearTokens = (): void => {
-  sessionStorage.removeItem(CONFIG.AUTH_TOKEN_KEY);
-  sessionStorage.removeItem(CONFIG.AUTH_REFRESH_KEY);
+  localStorage.removeItem(CONFIG.AUTH_TOKEN_KEY);
+  localStorage.removeItem(CONFIG.AUTH_REFRESH_KEY);
 };
 
 export const isAuthenticated = (): boolean => !!getToken();
@@ -113,6 +113,8 @@ export const httpClient = async <T = any>(
   const buildHeaders = (): Record<string, string> => {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Clinic-ID': CONFIG.CLINIC_ID,
+      ...(CONFIG.API_KEY ? { 'x-api-key': CONFIG.API_KEY } : {}),
       ...headers,
     };
     const token = getToken();

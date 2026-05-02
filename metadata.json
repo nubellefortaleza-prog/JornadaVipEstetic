@@ -1,0 +1,7 @@
+{
+  "name": "Jornada VIP Estética",
+  "description": "Aplicativo premium para acompanhamento de jornada estética VIP, com anamnese inteligente, acompanhamento pós-procedimento e gamificação.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
