@@ -461,6 +461,35 @@ export const trackSessionEvent = async (
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  SCHEDULING (novo — CRM v2 com link público de agendamento)
+//
+//  Bug conhecido no CRM (em correção): slots retornados em UTC (servidor),
+//  browser BRT exibe 3h a menos. Não consumir horários de slots até fix.
+// ═════════════════════════════════════════════════════════════════════════════
+
+export interface TierInfo {
+  tier: string;
+  features: string[];
+  is_admin: boolean;
+  onboarding_completo: boolean;
+}
+
+export const getTierInfo = async (): Promise<TierInfo | null> => {
+  if (!hasBackend()) return null;
+  const res = await httpClient<TierInfo>('/api/tier/info');
+  return res.success ? res.data! : null;
+};
+
+export const generateBookingLink = async (patientId: string): Promise<string | null> => {
+  if (!hasBackend()) return null;
+  const res = await httpClient<{ url: string }>(
+    `/api/pacientes/${patientId}/gerar-link-agendamento`,
+    { method: 'POST' },
+  );
+  return res.success && res.data?.url ? res.data.url : null;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  WEBHOOKS (admin)
 // ═════════════════════════════════════════════════════════════════════════════
 

@@ -9,6 +9,7 @@ import {
 import { trackScreen, trackFeature, trackNotificationOpened } from '../services/analyticsService';
 import { CONFIG } from '../services/config';
 import * as api from '../services/apiService';
+import { hasBackend } from '../services/config';
 
 const WHATSAPP_NUMBER = CONFIG.WHATSAPP_NUMBER;
 const INSTAGRAM_URL = CONFIG.INSTAGRAM_URL;
@@ -28,6 +29,8 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
   const [campaignQueue, setCampaignQueue] = useState<PopupCampaign[]>([]);
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const [anamnesisComplete, setAnamnesisComplete] = useState(true);
+  const [bookingLink, setBookingLink] = useState<string | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const firstName = profile?.name?.split(' ')[0] || 'Paciente';
 
@@ -214,12 +217,50 @@ const DashboardView: React.FC<Props> = ({ profile, rewards, onOpenChat, onNaviga
         </div>
       </div>
 
-      {/* ── Bloco de Próximo Atendimento ─────────────────────────────────────── */}
-      <div className="bg-white/5 border-l-4 border-sage rounded-xl p-5">
-        <span className="text-[11px] uppercase tracking-widest text-white/60 font-bold">Seu próximo atendimento</span>
-        <h3 className="text-lg font-serif sage-green mt-1">Sexta-feira, 25 de Outubro</h3>
-        <p className="text-[11px] text-white/60 mt-0.5">Horário: 14:30h • Dra. Sofia</p>
-      </div>
+      {/* ── Agendamento ──────────────────────────────────────────────────────── */}
+      <button
+        disabled={bookingLoading}
+        onClick={async () => {
+          if (bookingLink) {
+            window.open(bookingLink, '_blank');
+            trackFeature(profile.id, 'agendar_consulta');
+            return;
+          }
+          if (!hasBackend()) {
+            const msg = encodeURIComponent('Olá! Gostaria de agendar uma consulta.');
+            window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+            trackFeature(profile.id, 'agendar_whatsapp');
+            return;
+          }
+          setBookingLoading(true);
+          try {
+            const link = await api.generateBookingLink(profile.id);
+            if (link) {
+              setBookingLink(link);
+              window.open(link, '_blank');
+              trackFeature(profile.id, 'agendar_consulta');
+            }
+          } finally {
+            setBookingLoading(false);
+          }
+        }}
+        className="w-full bg-sage/10 border border-sage/30 rounded-2xl p-5 text-left flex items-center space-x-4 hover:bg-sage/20 transition-all disabled:opacity-60"
+      >
+        <div className="w-12 h-12 bg-sage/20 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-sage">
+            {bookingLoading ? 'Gerando link...' : 'Agendar Consulta'}
+          </p>
+          <p className="text-[11px] text-white/50 mt-0.5">Escolha o melhor horário para você</p>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sage/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
 
       {/* ── Grid Features ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
