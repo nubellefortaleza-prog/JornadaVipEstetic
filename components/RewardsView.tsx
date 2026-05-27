@@ -3,7 +3,7 @@ import React from 'react';
 import { RewardPoints } from '../types';
 import { trackReferralSent } from '../services/analyticsService';
 
-const APP_URL = 'https://vipestetica.app'; // Configure com a URL real do app
+const APP_URL = 'https://jornadavip.vipestetic.com.br';
 
 interface Props {
   rewards: RewardPoints;

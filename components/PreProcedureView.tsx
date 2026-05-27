@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
+import { CONFIG } from '../services/config';
 
-const WHATSAPP_NUMBER = '5500000000000'; // Configure com o número da clínica
+const WHATSAPP_NUMBER = CONFIG.WHATSAPP_NUMBER;
 
 interface Props {
   onBack: () => void;

@@ -27,7 +27,7 @@ export const CONFIG = {
 
   // ── Clínica ──────────────────────────────────────────────────────────────
   CLINIC_NAME: 'Vip Estétic',
-  WHATSAPP_NUMBER: import.meta.env.VITE_WHATSAPP_NUMBER || '5585000000000',
+  WHATSAPP_NUMBER: import.meta.env.VITE_WHATSAPP_NUMBER || '5585991656767',
   INSTAGRAM_URL: import.meta.env.VITE_INSTAGRAM_URL || 'https://instagram.com/vipestetic',
   YOUTUBE_URL: import.meta.env.VITE_YOUTUBE_URL || 'https://youtube.com/@vipestetic',
 

@@ -325,10 +325,9 @@ export const adminLogin = async (username: string, password: string): Promise<Lo
   }
 
   // localStorage fallback — usa adminAuthService existente
-  const { adminLogin: localLogin } = await import('./adminAuthService');
-  const user = localLogin(cleanUser, password);
+  const { adminLoginAsync: localLogin, setAdminSession } = await import('./adminAuthService');
+  const user = await localLogin(cleanUser, password);
   if (user) {
-    const { setAdminSession } = await import('./adminAuthService');
     setAdminSession(user);
     return { success: true, user };
   }
